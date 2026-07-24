@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Shelf — Unity Homes Library Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="ambient-bg" id="ambient-bg" aria-hidden="true">
+        <div class="blob-parallax" style="--depth: 0.6;"><div class="blob blob-red"></div></div>
+        <div class="blob-parallax" style="--depth: 1;"><div class="blob blob-teal"></div></div>
+        <div class="blob-parallax" style="--depth: 0.8;"><div class="blob blob-indigo"></div></div>
+        <div class="blob-parallax" style="--depth: 1.3;"><div class="blob blob-wheat"></div></div>
+        <div class="blob-parallax" style="--depth: 0.9;"><div class="blob blob-cambridge"></div></div>
+        <div class="cursor-pattern" id="cursor-pattern"></div>
+    </div>
+
+    <header class="global-header">
+        <div class="header-container">
+            <a href="#" class="brand-logo" onclick="event.preventDefault(); router.navigate('catalog')">
+                <img src="assets/unity-shelf-mark.png" class="brand-logo-mark" alt="Unity Shelf">
+                <span class="logo-bold">Unity</span><span class="logo-light">Shelf</span>
+            </a>
+            <div id="nav-user-info" class="desktop-nav" style="display: none;">
+                <div class="user-menu" id="user-menu">
+                    <button class="user-menu-trigger" onclick="toggleUserMenu(event)">
+                        <div class="user-meta-block">
+                            <span id="nav-user-name" class="user-profile-name"></span>
+                            <span id="nav-user-badge" class="user-profile-badge"></span>
+                        </div>
+                        <i class="fas fa-chevron-down user-menu-caret"></i>
+                    </button>
+                    <div class="user-menu-panel" id="user-menu-panel">
+                        <button id="nav-admin-link" onclick="closeUserMenu(); router.navigate('admin')" class="user-menu-item" style="display: none;"><i class="fas fa-user-shield"></i> Admin Dashboard</button>
+                        <button onclick="closeUserMenu(); router.navigate('catalog')" class="user-menu-item"><i class="fas fa-book-open"></i> Browse Catalog</button>
+                        <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> My Loans</button>
+                        <button onclick="closeUserMenu(); router.navigate('changepin')" class="user-menu-item"><i class="fas fa-key"></i> Change PIN</button>
+                        <div class="user-menu-divider"></div>
+                        <button onclick="closeUserMenu(); handleLogout()" class="user-menu-item user-menu-item-danger"><i class="fas fa-sign-out-alt"></i> Log Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="view-container" class="view-visible">
+        </main>
+
+    <div id="app-toast" class="app-toast"></div>
+
+    <template id="tmpl-login">
+        <section class="hero-section">
+            <div class="container hero-grid">
+                <div class="hero-copy">
+                    <span class="tagline-badge">A Unity Homes Community Amenity</span>
+                    <h1 class="hero-title">A shared shelf for every Unity Homes estate.</h1>
+                    <p class="hero-subtitle">Borrow a book, pass it on, and meet your neighbours in between. The Unity Shelf runs on the same trust that built our estates — everything below is what's currently on it.</p>
+                </div>
+
+                <div class="auth-card auth-toggle-card hero-auth-card">
+                    <div class="auth-tab-switcher" id="auth-tab-switcher">
+                        <span class="auth-tab-indicator" id="auth-tab-indicator"></span>
+                        <button type="button" id="tab-login" class="auth-tab-btn active" onclick="switchAuthTab('login')">Log In</button>
+                        <button type="button" id="tab-register" class="auth-tab-btn" onclick="switchAuthTab('register')">Create Account</button>
+                    </div>
+
+                    <div class="auth-panels" id="auth-panels">
+                        <div class="auth-panel active" id="panel-login">
+                            <div class="card-header">
+                                <div class="icon-badge icon-badge-1"><i class="fas fa-lock-open"></i></div>
+                                <h3 class="auth-title">Log In</h3>
+                                <p class="auth-subtitle">Access your library account</p>
+                            </div>
+                            <form onsubmit="handleLoginAttempt(event)" class="contact-form-matrix">
+                                <div class="form-group">
+                                    <label class="form-label" for="signin-id">Email or Phone Number</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-address-book input-icon"></i>
+                                        <input type="text" id="signin-id" class="form-input" placeholder="Work email or phone number" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="signin-pass">Security PIN</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-key input-icon"></i>
+                                        <input type="password" id="signin-pass" class="form-input" placeholder="••••" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-uh-primary mt-2">Log In</button>
+                                <p class="auth-switch-hint">New here? <a href="#" onclick="event.preventDefault(); switchAuthTab('register')">Create an account</a></p>
+                            </form>
+                        </div>
+
+                        <div class="auth-panel" id="panel-register">
+                            <div class="card-header">
+                                <div class="icon-badge icon-badge-2"><i class="fas fa-user-plus"></i></div>
+                                <h3 class="auth-title">Create an Account</h3>
+                                <p class="auth-subtitle">Register as a resident or staff member</p>
+                            </div>
+                            <form onsubmit="handleRegistrationAttempt(event)" class="contact-form-matrix">
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-estate">Estate</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-map-pin input-icon"></i>
+                                        <select id="signup-estate" class="form-input form-select" required>
+                                            <option value="" disabled selected>Select your estate</option>
+                                            <option value="Unity One">Unity One</option>
+                                            <option value="Unity West">Unity West</option>
+                                            <option value="Unity East">Unity East</option>
+                                            <option value="Unity Gardens">Unity Gardens</option>
+                                            <option value="Silver Hill">Silver Hill</option>
+                                            <option value="Unity Parkside">Unity Parkside</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-affiliation">Account Type</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-users input-icon"></i>
+                                        <select id="signup-affiliation" class="form-input form-select" onchange="toggleRegistrationFields(this.value)" required>
+                                            <option value="" disabled selected>Select your account type</option>
+                                            <option value="Resident">Unity Homes Resident</option>
+                                            <option value="Staff">Operations Staff Member</option>
+                                            <option value="Library Assistant">Library Assistant</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-name">Full Name</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-user input-icon"></i>
+                                        <input type="text" id="signup-name" class="form-input" placeholder="e.g. Jane Doe" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-group" id="staff-email-group" style="display: none;">
+                                    <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag">[@unityhomes.co.ke]</span></label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-envelope input-icon"></i>
+                                        <input type="email" id="signup-work-email" class="form-input" placeholder="you@unityhomes.co.ke">
+                                    </div>
+                                </div>
+
+                                <div class="form-group" id="resident-unit-group" style="display: none;">
+                                    <label class="form-label" for="signup-unit">Unit Number</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-door-open input-icon"></i>
+                                        <input type="text" id="signup-unit" class="form-input" placeholder="e.g. WEST-14B">
+                                    </div>
+                                </div>
+                                <div class="form-group" id="resident-phone-group" style="display: none;">
+                                    <label class="form-label" for="signup-phone">Phone Number</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-phone input-icon"></i>
+                                        <input type="tel" id="signup-phone" class="form-input" placeholder="e.g. 07XXXXXXXX">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-uh-secondary mt-2">Register Account</button>
+                                <p class="auth-switch-hint">Already have an account? <a href="#" onclick="event.preventDefault(); switchAuthTab('login')">Log in</a></p>
+                            </form>
+                        </div>
+
+                        <div class="auth-panel" id="panel-verify">
+                            <div class="card-header">
+                                <div class="icon-badge icon-badge-3"><i class="fas fa-shield-halved"></i></div>
+                                <h3 class="auth-title">Verify Your Account</h3>
+                                <p class="auth-subtitle" id="verify-subtitle">Enter the code we sent you</p>
+                            </div>
+                            <form onsubmit="handleVerifyAccount(event)" class="contact-form-matrix">
+                                <input type="hidden" id="verify-userid">
+                                <div class="form-group">
+                                    <label class="form-label" for="verify-code">Verification Code</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-hashtag input-icon"></i>
+                                        <input type="text" id="verify-code" class="form-input" placeholder="6-digit code" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-uh-primary mt-2">Verify</button>
+                                <p class="auth-switch-hint">Wrong details? <a href="#" onclick="event.preventDefault(); switchAuthTab('register')">Start over</a></p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="container mb-12">
+            <div class="disclaimer-card">
+                <div class="icon-badge icon-badge-outline"><i class="fas fa-scale-balanced"></i></div>
+                <div class="disclaimer-content">
+                    <h3>Library Borrowing Rules</h3>
+                    <p>Books can be borrowed free of charge for up to <strong>21 days</strong>. Returning a book late will attract a fine of <strong class="penalty-highlight">KSH 50 per day</strong>. Accounts with fines overdue by more than 14 days will be temporarily suspended.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="container pb-16">
+            <div class="perks-grid">
+                <div class="perk-item">
+                    <div class="icon-badge icon-badge-2"><i class="fas fa-shield-halved"></i></div>
+                    <h4>Resident Priority</h4>
+                    <p>Access is exclusive to Unity Homes residents and operations staff.</p>
+                </div>
+                <div class="perk-item">
+                    <div class="icon-badge icon-badge-3"><i class="fas fa-arrows-rotate"></i></div>
+                    <h4>Live Catalog Sync</h4>
+                    <p>Availability updates in real time as books are borrowed and returned.</p>
+                </div>
+                <div class="perk-item">
+                    <div class="icon-badge icon-badge-4"><i class="fas fa-people-group"></i></div>
+                    <h4>Community Library</h4>
+                    <p>Shared across Unity One, West, East, Gardens, Silver Hill, and Parkside.</p>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="tmpl-catalog">
+        <section class="section-padding container">
+            <div class="section-header text-center">
+                <span class="section-meta">LIVE CATALOGUE</span>
+                <h2 class="section-title">Browse Available Books</h2>
+
+                <div id="catalog-stats-strip" class="stats-strip mt-6"></div>
+
+                <div class="search-bar-frame mt-6">
+                    <div class="search-input-frame">
+                        <i class="fas fa-magnifying-glass search-frame-icon"></i>
+                        <input type="text" id="search-bar" class="form-input search-box-override" placeholder="Search by title or author..." autocomplete="off" oninput="handleCatalogSearch(this.value)" onfocus="handleCatalogSearch(this.value)">
+                    </div>
+                    <div id="search-suggestions" class="search-suggestions"></div>
+                </div>
+
+                <div class="filter-actions-cluster mt-6">
+                    <button id="filter-pill-ALL" onclick="handleCatalogFilter('ALL')" class="filter-pill-btn active">All Books</button>
+                    <button id="filter-pill-AVAILABLE" onclick="handleCatalogFilter('AVAILABLE')" class="filter-pill-btn">Available</button>
+                    <button id="filter-pill-ON_LOAN" onclick="handleCatalogFilter('ON_LOAN')" class="filter-pill-btn">Borrowed</button>
+                </div>
+                <p id="catalog-count-label" class="text-xs text-secondary mt-2"></p>
+            </div>
+
+            <div class="trending-section mt-6">
+                <h3 class="trending-heading"><i class="fas fa-fire"></i> What Residents Are Reading</h3>
+                <div id="top-books-strip" class="trending-strip"></div>
+            </div>
+
+            <div id="catalog-list" class="mt-6">
+                </div>
+
+            <div class="navigation-hub-tray mt-12">
+                <button onclick="router.navigate('dashboard')" class="btn btn-uh-secondary font-bold"><i class="fas fa-folder-open"></i> View My Borrowed Books</button>
+            </div>
+        </section>
+    </template>
+
+    <template id="tmpl-dashboard">
+        <section class="section-padding container">
+            <div class="section-header text-center">
+                <span class="section-meta">USER ACCOUNT</span>
+                <h2 class="section-title">Your Active Loans</h2>
+                <div id="total-fines-badge" class="penalty-summary-badge mt-2">Calculating current balance...</div>
+            </div>
+
+            <div id="loans-list" class="auth-grid mt-6">
+                </div>
+
+            <div class="navigation-hub-tray mt-12">
+                <button onclick="router.navigate('catalog')" class="btn btn-uh-primary"><i class="fas fa-book-bookmark"></i> Back to Book Catalog</button>
+            </div>
+        </section>
+
+        <section class="container pb-16" id="reservations-section" style="display: none;">
+            <div class="section-header text-center">
+                <span class="section-meta">WAITLIST</span>
+                <h2 class="section-title">My Reservations</h2>
+            </div>
+            <div id="reservations-list" class="auth-grid mt-6"></div>
+        </section>
+
+        <section class="container pb-16">
+            <div class="section-header text-center">
+                <span class="section-meta">ON THE SHELF RIGHT NOW</span>
+                <h2 class="section-title">What's Currently Available</h2>
+            </div>
+            <div class="hero-slider-wrap mt-6">
+                <div class="hero-slider" id="hero-slider"></div>
+                <div class="hero-slider-dots" id="hero-slider-dots"></div>
+            </div>
+        </section>
+    </template>
+
+    <template id="tmpl-changepin">
+        <section class="section-padding container">
+            <div class="section-header text-center">
+                <span class="section-meta">ACCOUNT SECURITY</span>
+                <h2 class="section-title">Change Your Security PIN</h2>
+                <p class="hero-subtitle" style="margin-top: 0.5rem;">Every new account starts on the shared default PIN. Set your own so only you can access your account.</p>
+            </div>
+
+            <div class="auth-grid mt-6" style="max-width: 500px;">
+                <div class="auth-card">
+                    <form onsubmit="handleChangePinAttempt(event)" class="contact-form-matrix">
+                        <div class="form-group">
+                            <label class="form-label" for="changepin-current">Current PIN</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-key input-icon"></i>
+                                <input type="password" id="changepin-current" class="form-input" placeholder="Current PIN" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="changepin-new">New PIN</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" id="changepin-new" class="form-input" placeholder="New PIN (min. 4 characters)" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="changepin-confirm">Confirm New PIN</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock input-icon"></i>
+                                <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new PIN" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-uh-primary mt-2">Update PIN</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="navigation-hub-tray mt-12">
+                <button onclick="router.navigate('dashboard')" class="btn btn-uh-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</button>
+            </div>
+        </section>
+    </template>
+
+    <template id="tmpl-admin">
+        <section class="section-padding container">
+            <div class="section-header text-center">
+                <span class="section-meta">LIBRARY ASSISTANT</span>
+                <h2 class="section-title">Admin Dashboard</h2>
+            </div>
+
+            <div id="admin-stats-strip" class="stats-strip mt-6"></div>
+
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-book-open"></i> All Active Loans</h3>
+                <div id="admin-loans-table" class="admin-table-wrap"></div>
+            </div>
+
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-bookmark"></i> Active Reservations</h3>
+                <div id="admin-reservations-table" class="admin-table-wrap"></div>
+            </div>
+
+            <div class="navigation-hub-tray mt-12">
+                <button onclick="router.navigate('catalog')" class="btn btn-uh-secondary"><i class="fas fa-book-bookmark"></i> Browse Catalog</button>
+            </div>
+        </section>
+    </template>
+
+    <template id="tmpl-shimmer">
+        <div class="auth-card shimmer-box-skeleton" style="min-height: 140px;">
+            <div class="shimmer-line header-shimmer"></div>
+            <div class="shimmer-line sub-shimmer"></div>
+            <div class="shimmer-line btn-shimmer"></div>
+        </div>
+    </template>
+
+    <footer class="global-footer">
+        <div class="container text-center">
+            <p>&copy; 2026 Unity Shelf — a Unity Homes Library System. All transaction records safely secured.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

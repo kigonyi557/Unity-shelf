@@ -255,7 +255,17 @@ window.handleRegistrationAttempt = async function(event) {
     const estateInput = document.getElementById('signup-estate').value;
     const accountTypeInput = document.getElementById('signup-affiliation').value;
     const nameInput = document.getElementById('signup-name').value.trim();
+    const dobInput = document.getElementById('signup-dob').value; // 'YYYY-MM-DD'
     const pinInput = "1234"; // Default security pin assigned initially
+
+    if (!dobInput) {
+        showToast('❌ Date of birth is required.');
+        return;
+    }
+    if (new Date(dobInput) > new Date()) {
+        showToast('❌ Date of birth cannot be in the future.');
+        return;
+    }
 
     const isStaffLike = accountTypeInput === 'Staff' || accountTypeInput === 'Library Assistant';
     let userIdInput = '';
@@ -282,7 +292,7 @@ window.handleRegistrationAttempt = async function(event) {
         const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
         const registrationPayload = {
             name: nameInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash,
-            workEmail: workEmailInput, unitNumber: unitInput, phone: phoneInput,
+            workEmail: workEmailInput, unitNumber: unitInput, phone: phoneInput, dateOfBirth: dobInput,
             registeredAt: new Date().toISOString()
         };
 
@@ -295,7 +305,7 @@ window.handleRegistrationAttempt = async function(event) {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash });
+            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, dateOfBirth: dobInput });
             saveStateToStorage();
             showToast(`🎉 ${result.message || 'Account created.'}`);
             switchAuthTab('verify');
@@ -312,7 +322,7 @@ window.handleRegistrationAttempt = async function(event) {
             showToast("❌ An account already exists for that email/phone inside local memory cache.");
         } else {
             const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash });
+            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, dateOfBirth: dobInput });
             saveStateToStorage();
             showToast(`⚠️ Network unavailable: Saved profile to local cache. You'll need to verify once back online.`);
         }
@@ -517,6 +527,7 @@ async function fetchRemoteIndexData() {
             AppState.loans = result.loans || [];
             AppState.reservations = result.reservations || [];
             AppState.stats = result.stats || null;
+            AppState.restrictedForMinor = !!result.restrictedForMinor;
             AppState.offlineMode = false;
             saveStateToStorage();
         }
@@ -733,10 +744,15 @@ function compileCatalogDisplayBlock() {
         filteredDataset = filteredDataset.filter(t => !titleHasAvailableCopy(t));
     }
     if (activeCatalogQuery) {
-        filteredDataset = filteredDataset.filter(t => t.title.toLowerCase().includes(activeCatalogQuery) || t.author.toLowerCase().includes(activeCatalogQuery));
+        // Some titles have no author on record (author: null) — guard with
+        // `|| ''` so those don't throw and silently break the whole render.
+        filteredDataset = filteredDataset.filter(t => (t.title || '').toLowerCase().includes(activeCatalogQuery) || (t.author || '').toLowerCase().includes(activeCatalogQuery));
     }
 
     document.getElementById('catalog-count-label').textContent = `${filteredDataset.length} titles found in catalog database index.`;
+
+    const restrictionNote = document.getElementById('minor-restriction-note');
+    if (restrictionNote) restrictionNote.style.display = AppState.restrictedForMinor ? 'block' : 'none';
 
     if (filteredDataset.length === 0) {
         displayGrid.innerHTML = `<p style="text-align: center; font-size: 0.85rem; color: var(--text-secondary); padding: 3rem 0; font-style: italic;">No books found matching search terms.</p>`;
@@ -798,7 +814,7 @@ function compileCatalogDisplayBlock() {
             <div class="catalog-item-card">
                 <div>
                     <h4 class="auth-title">${t.title}</h4>
-                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${t.author}</p>
+                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${t.author || 'Unknown author'}</p>
                     ${iconStats ? `<div class="icon-stat-row">${iconStats}</div>` : ''}
                     <span class="status-badge-node ${anyAvailable ? 'status-available' : 'status-loaned'}">
                         ${anyAvailable ? 'AVAILABLE' : 'ALL ON LOAN'}
@@ -906,7 +922,7 @@ function renderSearchSuggestions(rawQuery) {
 
     const q = rawQuery.toLowerCase();
     const matches = (AppState.titles || [])
-        .filter(t => t.title.toLowerCase().includes(q) || t.author.toLowerCase().includes(q))
+        .filter(t => (t.title || '').toLowerCase().includes(q) || (t.author || '').toLowerCase().includes(q))
         .slice(0, 6);
 
     if (matches.length === 0) {
@@ -919,7 +935,7 @@ function renderSearchSuggestions(rawQuery) {
                     <i class="fas ${anyAvailable ? 'fa-book-open' : 'fa-book'}"></i>
                     <div>
                         <div class="search-suggestion-title">${t.title}</div>
-                        <div class="search-suggestion-meta">By ${t.author} — ${anyAvailable ? 'Available' : 'All on loan'}</div>
+                        <div class="search-suggestion-meta">By ${t.author || 'Unknown author'} — ${anyAvailable ? 'Available' : 'All on loan'}</div>
                     </div>
                 </button>
             `;

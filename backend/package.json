@@ -4,12 +4,12 @@
   "description": "Backend for the Unity Shelf library portal — matches the app.js/index.html/styles.css front end exactly.",
   "main": "src/server.js",
   "type": "commonjs",
-  "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "seed": "node src/seed.js",
-    "import-inventory": "node src/importInventory.js"
-  },
+ "scripts": {
+  "start": "node src/server.js",
+  "dev": "node --watch src/server.js",
+  "seed": "node src/seed.js",
+  "import-inventory": "node src/importInventory.js"
+},
   "dependencies": {
     "better-sqlite3": "^11.3.0",
     "cors": "^2.8.5",

@@ -21,6 +21,7 @@ db.exec(`
     work_email        TEXT,
     unit_number       TEXT,
     phone             TEXT,
+    date_of_birth     TEXT,
     passcode_hash     TEXT NOT NULL,
     verified          INTEGER NOT NULL DEFAULT 0,
     registered_date   TEXT NOT NULL
@@ -82,5 +83,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_res_title ON library_reservations(title_id, branch);
   CREATE INDEX IF NOT EXISTS idx_res_user ON library_reservations(user_id);
 `);
+
+// Runtime migration: databases created before date_of_birth existed (e.g.
+// the already-live production DB) won't have this column yet — CREATE
+// TABLE IF NOT EXISTS above only affects brand-new databases. Add it here
+// if missing, so existing accounts and data are preserved.
+const accountColumns = db.prepare(`PRAGMA table_info(library_accounts)`).all();
+if (!accountColumns.some(c => c.name === 'date_of_birth')) {
+  db.exec(`ALTER TABLE library_accounts ADD COLUMN date_of_birth TEXT`);
+}
 
 module.exports = db;

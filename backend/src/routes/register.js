@@ -11,10 +11,15 @@ const CODE_TTL_MINUTES = 15;
 // POST /webhook/library-registration
 router.post('/', async (req, res) => {
   const b = req.body || {};
-  const { name, estateBranch, accountType, passcodeHash, workEmail, unitNumber, phone } = b;
+  const { name, estateBranch, accountType, passcodeHash, workEmail, unitNumber, phone, dateOfBirth } = b;
 
   if (!name || !accountType || !passcodeHash || !VALID_TYPES.includes(accountType)) {
     return res.status(400).json({ success: false, message: 'Missing or invalid registration fields.' });
+  }
+
+  const dob = new Date(dateOfBirth);
+  if (!dateOfBirth || isNaN(dob.getTime()) || dob > new Date()) {
+    return res.status(400).json({ success: false, message: 'A valid date of birth is required.' });
   }
 
   const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
@@ -44,9 +49,9 @@ router.post('/', async (req, res) => {
   const willAutoVerify = !isStaffLike;
 
   db.prepare(`
-    INSERT INTO library_accounts (user_id, name, account_type, estate_branch, work_email, unit_number, phone, passcode_hash, verified, registered_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(userId, name, accountType, estateBranch || null, isStaffLike ? userId : null, unitNumber || null, isStaffLike ? null : userId, passcodeHash, willAutoVerify ? 1 : 0, new Date().toISOString());
+    INSERT INTO library_accounts (user_id, name, account_type, estate_branch, work_email, unit_number, phone, date_of_birth, passcode_hash, verified, registered_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(userId, name, accountType, estateBranch || null, isStaffLike ? userId : null, unitNumber || null, isStaffLike ? null : userId, dateOfBirth, passcodeHash, willAutoVerify ? 1 : 0, new Date().toISOString());
 
   if (!willAutoVerify) {
     const code = genVerificationCode();

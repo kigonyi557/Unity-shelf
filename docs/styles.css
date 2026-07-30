@@ -127,7 +127,8 @@ h1, h2, h3, h4, .auth-title, .section-title, .hero-title, .logo-bold, .logo-ligh
 .global-header { background-color: var(--bg-white); border-bottom: 1px solid var(--border-grey); box-shadow: 0 1px 3px rgba(20, 35, 58, 0.04); padding: 1rem 2rem; position: sticky; top: 0; z-index: 100; }
 .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
 .brand-logo { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
-.brand-logo-mark { height: 32px; width: auto; }
+.brand-logo-mark { height: 38px; width: auto; }
+.field-hint { font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.3rem; line-height: 1.35; }
 .logo-bold { font-size: 1.4rem; font-weight: 800; color: var(--uh-red); letter-spacing: -0.03em; }
 .logo-light { font-size: 1.4rem; font-weight: 400; color: var(--text-dark); letter-spacing: -0.03em; }
 .logo-subtext { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; border: 1px solid var(--uh-red); color: var(--uh-red); padding: 0.15rem 0.4rem; margin-left: 0.6rem; border-radius: 3px; }

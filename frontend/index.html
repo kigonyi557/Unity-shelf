@@ -24,8 +24,7 @@
     <header class="global-header">
         <div class="header-container">
             <a href="#" class="brand-logo" onclick="event.preventDefault(); router.navigate('catalog')">
-                <img src="assets/unity-shelf-mark.png" class="brand-logo-mark" alt="Unity Shelf">
-                <span class="logo-bold">Unity</span><span class="logo-light">Shelf</span>
+                <img src="assets/unity-shelf-mark.png" class="brand-logo-mark" alt="Our Community Foundation">
             </a>
             <div id="nav-user-info" class="desktop-nav" style="display: none;">
                 <div class="user-menu" id="user-menu">
@@ -139,6 +138,15 @@
                                     </div>
                                 </div>
 
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-dob">Date of Birth</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-cake-candles input-icon"></i>
+                                        <input type="date" id="signup-dob" class="form-input" required>
+                                    </div>
+                                    <p class="field-hint">Used to keep age-restricted titles out of under-18 catalogs. Not shared publicly.</p>
+                                </div>
+
                                 <div class="form-group" id="staff-email-group" style="display: none;">
                                     <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag">[@unityhomes.co.ke]</span></label>
                                     <div class="input-wrapper">
@@ -244,6 +252,7 @@
                     <button id="filter-pill-ON_LOAN" onclick="handleCatalogFilter('ON_LOAN')" class="filter-pill-btn">Borrowed</button>
                 </div>
                 <p id="catalog-count-label" class="text-xs text-secondary mt-2"></p>
+                <p id="minor-restriction-note" class="field-hint" style="display:none;"><i class="fas fa-shield-halved"></i> Some titles are hidden because this account is registered as under 18.</p>
             </div>
 
             <div class="trending-section mt-6">

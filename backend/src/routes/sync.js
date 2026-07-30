@@ -1,15 +1,30 @@
 const express = require('express');
 const db = require('../db');
-const { evaluateLoanMetrics } = require('../util');
+const { evaluateLoanMetrics, calculateAge } = require('../util');
 const { optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+const isAdultBracket = (bracket) => (bracket || '').toString().trim().toLowerCase() === 'adults';
 
 // POST /webhook/library-sync   Body: { userId }  (userId '' for the public hero preview)
 router.post('/', optionalAuth, (req, res) => {
   const userId = (req.body?.userId || '').trim();
 
-  const titleRows = db.prepare('SELECT * FROM library_titles').all();
+  // Age-gate: accounts younger than 18 don't see Adults-bracket titles at
+  // all — filtered out here, server-side, so it can't be bypassed by
+  // editing the front end. Accounts with no date_of_birth on record (e.g.
+  // registered before this field existed) are treated as adult rather
+  // than locked out of content they could already see.
+  let isMinor = false;
+  if (userId) {
+    const account = db.prepare('SELECT date_of_birth FROM library_accounts WHERE user_id = ?').get(userId);
+    const age = account ? calculateAge(account.date_of_birth) : null;
+    isMinor = age !== null && age < 18;
+  }
+
+  const titleRows = db.prepare('SELECT * FROM library_titles').all()
+    .filter(t => !isMinor || !isAdultBracket(t.age_bracket));
   const copyRows = db.prepare('SELECT * FROM library_copies').all();
   const copiesByTitle = {};
   for (const c of copyRows) {
@@ -44,7 +59,7 @@ router.post('/', optionalAuth, (req, res) => {
   }).filter(Boolean);
 
   res.json({
-    titles, loans, reservations,
+    titles, loans, reservations, restrictedForMinor: isMinor,
     stats: { totalTitles: titles.length, totalCopies, activeLoans: activeLoansCount, estatesCount, topBooks },
   });
 });

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { startReminderCron } = require('./cron');
 
 const app = express();
 app.use(express.json());
@@ -19,6 +20,8 @@ app.use('/webhook/library-auth', require('./routes/auth'));
 app.use('/webhook/library-registration', require('./routes/register'));
 app.use('/webhook/library-verify-account', require('./routes/verify'));
 app.use('/webhook/library-change-pin', require('./routes/changePin'));
+app.use('/webhook/library-forgot-password', require('./routes/forgotPassword'));
+app.use('/webhook/library-reset-password', require('./routes/resetPassword'));
 app.use('/webhook/library-sync', require('./routes/sync'));
 app.use('/webhook/library-update', require('./routes/transaction'));
 app.use('/webhook/library-reserve', require('./routes/reserve'));
@@ -28,4 +31,5 @@ app.use('/webhook/library-admin-overview', require('./routes/adminOverview'));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Unity Shelf backend listening on port ${PORT}`);
+  startReminderCron();
 });

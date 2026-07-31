@@ -8,6 +8,8 @@ const CONFIG = {
     N8N_TRANSACTION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-update",
     N8N_CHANGE_PIN_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-change-pin",
     N8N_VERIFY_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-verify-account",
+    N8N_FORGOT_PASSWORD_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-forgot-password",
+    N8N_RESET_PASSWORD_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-reset-password",
     N8N_RESERVE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-reserve",
     N8N_CANCEL_RESERVATION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-cancel-reservation",
     N8N_ADMIN_OVERVIEW_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-admin-overview",
@@ -195,7 +197,7 @@ window.handleLoginAttempt = async function(event) {
             const verifyUserIdField = document.getElementById('verify-userid');
             const verifySubtitle = document.getElementById('verify-subtitle');
             if (verifyUserIdField) verifyUserIdField.value = result.userId || userIdInput;
-            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${result.userId || userIdInput}`;
+            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${result.verifyDestination || result.userId || userIdInput}`;
             return;
         }
         showToast(`❌ Login Failed: ${result.message || 'Check your entries.'}`);
@@ -229,9 +231,11 @@ window.toggleRegistrationFields = function(accountType) {
     const staffGroup = document.getElementById('staff-email-group');
     const unitGroup = document.getElementById('resident-unit-group');
     const phoneGroup = document.getElementById('resident-phone-group');
+    const emailGroup = document.getElementById('resident-email-group');
     const workEmailInput = document.getElementById('signup-work-email');
     const unitInput = document.getElementById('signup-unit');
     const phoneInput = document.getElementById('signup-phone');
+    const emailInput = document.getElementById('signup-email');
 
     const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
     const isResident = accountType === 'Resident';
@@ -239,31 +243,35 @@ window.toggleRegistrationFields = function(accountType) {
     if (staffGroup) staffGroup.style.display = isStaffLike ? 'flex' : 'none';
     if (unitGroup) unitGroup.style.display = isResident ? 'flex' : 'none';
     if (phoneGroup) phoneGroup.style.display = isResident ? 'flex' : 'none';
+    if (emailGroup) emailGroup.style.display = isResident ? 'flex' : 'none';
 
     if (workEmailInput) workEmailInput.required = isStaffLike;
     if (unitInput) unitInput.required = isResident;
     if (phoneInput) phoneInput.required = isResident;
+    if (emailInput) emailInput.required = isResident;
 };
 
 // Handles form submission when creating a new user profile. Staff register
 // with a work email (must match the company domain); residents register
-// with a Unit Number (checked against the roster) and a phone number.
-// Neither path uses National ID / Passport as a credential anymore.
+// with a Unit Number, phone number (their login ID), and a separate email
+// address (used only to deliver the verification code). Everyone sets
+// their own password here rather than starting on a shared default.
 window.handleRegistrationAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
     const estateInput = document.getElementById('signup-estate').value;
     const accountTypeInput = document.getElementById('signup-affiliation').value;
     const nameInput = document.getElementById('signup-name').value.trim();
-    const dobInput = document.getElementById('signup-dob').value; // 'YYYY-MM-DD'
-    const pinInput = "1234"; // Default security pin assigned initially
+    const isAdultInput = document.getElementById('signup-is-adult').checked;
+    const pinInput = document.getElementById('signup-password').value;
+    const pinConfirmInput = document.getElementById('signup-password-confirm').value;
 
-    if (!dobInput) {
-        showToast('❌ Date of birth is required.');
+    if (pinInput.length < 6) {
+        showToast('❌ Password must be at least 6 characters.');
         return;
     }
-    if (new Date(dobInput) > new Date()) {
-        showToast('❌ Date of birth cannot be in the future.');
+    if (pinInput !== pinConfirmInput) {
+        showToast('❌ Passwords do not match.');
         return;
     }
 
@@ -272,6 +280,8 @@ window.handleRegistrationAttempt = async function(event) {
     let workEmailInput = '';
     let unitInput = '';
     let phoneInput = '';
+    let emailInput = '';
+    const EMAIL_FORMAT = /^\S+@\S+\.\S+$/;
 
     if (isStaffLike) {
         workEmailInput = document.getElementById('signup-work-email').value.trim().toLowerCase();
@@ -283,6 +293,11 @@ window.handleRegistrationAttempt = async function(event) {
     } else {
         unitInput = document.getElementById('signup-unit').value.trim();
         phoneInput = document.getElementById('signup-phone').value.trim();
+        emailInput = document.getElementById('signup-email').value.trim().toLowerCase();
+        if (!EMAIL_FORMAT.test(emailInput)) {
+            showToast('❌ A valid email address is required — that\'s where your verification code goes.');
+            return;
+        }
         userIdInput = phoneInput;
     }
 
@@ -292,7 +307,7 @@ window.handleRegistrationAttempt = async function(event) {
         const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
         const registrationPayload = {
             name: nameInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash,
-            workEmail: workEmailInput, unitNumber: unitInput, phone: phoneInput, dateOfBirth: dobInput,
+            workEmail: workEmailInput, email: emailInput, unitNumber: unitInput, phone: phoneInput, isAdult: isAdultInput,
             registeredAt: new Date().toISOString()
         };
 
@@ -305,14 +320,15 @@ window.handleRegistrationAttempt = async function(event) {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, dateOfBirth: dobInput });
+            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, isAdult: isAdultInput });
             saveStateToStorage();
             showToast(`🎉 ${result.message || 'Account created.'}`);
             switchAuthTab('verify');
             const verifyUserIdField = document.getElementById('verify-userid');
             const verifySubtitle = document.getElementById('verify-subtitle');
+            const verifyDestination = result.verifyDestination || emailInput || workEmailInput || result.userId || userIdInput;
             if (verifyUserIdField) verifyUserIdField.value = result.userId || userIdInput;
-            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${result.userId || userIdInput}`;
+            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${verifyDestination}`;
         } else {
             showToast(`❌ Registration Error: ${result.message || 'Server rejected creation.'}`);
         }
@@ -322,7 +338,7 @@ window.handleRegistrationAttempt = async function(event) {
             showToast("❌ An account already exists for that email/phone inside local memory cache.");
         } else {
             const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, dateOfBirth: dobInput });
+            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, isAdult: isAdultInput });
             saveStateToStorage();
             showToast(`⚠️ Network unavailable: Saved profile to local cache. You'll need to verify once back online.`);
         }
@@ -369,10 +385,10 @@ window.handleVerifyAccount = async function(event) {
     }
 };
 
-// Handles the "Change PIN" form — requires the correct current PIN before
-// a new one is accepted. Requires network; there is no offline path for
-// changing a credential, since the offline cache would then disagree with
-// the server about what's valid.
+// Handles the "Change Password" form — requires the correct current
+// password before a new one is accepted. Requires network; there is no
+// offline path for changing a credential, since the offline cache would
+// then disagree with the server about what's valid.
 window.handleChangePinAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -380,16 +396,16 @@ window.handleChangePinAttempt = async function(event) {
     const newPinInput = document.getElementById('changepin-new').value.trim();
     const confirmPinInput = document.getElementById('changepin-confirm').value.trim();
 
-    if (newPinInput.length < 4) {
-        showToast("❌ New PIN must be at least 4 characters.");
+    if (newPinInput.length < 6) {
+        showToast("❌ New password must be at least 6 characters.");
         return;
     }
     if (newPinInput !== confirmPinInput) {
-        showToast("❌ New PIN and confirmation do not match.");
+        showToast("❌ New password and confirmation do not match.");
         return;
     }
-    if (newPinInput === "1234") {
-        showToast("❌ Please choose something other than the default PIN.");
+    if (newPinInput === currentPinInput) {
+        showToast("❌ New password must be different from your current one.");
         return;
     }
 
@@ -411,7 +427,7 @@ window.handleChangePinAttempt = async function(event) {
             const cachedIdx = AppState.registeredUsers.findIndex(u => u.userId === userId);
             if (cachedIdx !== -1) AppState.registeredUsers[cachedIdx].passcodeHash = newPasscodeHash;
             saveStateToStorage();
-            showToast("✅ PIN updated successfully.");
+            showToast("✅ Password updated successfully.");
             router.navigate('dashboard');
         } else {
             showToast(`❌ ${result.message || 'Could not update PIN.'}`);
@@ -451,6 +467,129 @@ window.closeUserMenu = function() {
     if (menu) menu.classList.remove('open');
 };
 
+// =========================================================================
+// 3a3. GENERIC MODAL SYSTEM (Profile / Messages / Hot Reads)
+// =========================================================================
+// A single reusable overlay+panel, filled in per-use by the open*Modal()
+// functions below rather than building three separate modal components.
+
+window.closeActiveModal = function() {
+    const overlay = document.getElementById('uh-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+};
+
+function openModal(title, bodyHtml) {
+    const overlay = document.getElementById('uh-modal-overlay');
+    const titleNode = document.getElementById('uh-modal-title');
+    const bodyNode = document.getElementById('uh-modal-body');
+    if (!overlay || !titleNode || !bodyNode) return;
+    titleNode.textContent = title;
+    bodyNode.innerHTML = bodyHtml;
+    overlay.style.display = 'flex';
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.closeActiveModal();
+});
+
+// "My Profile" — name, account type/estate, and the books this user
+// currently has out, in one place instead of scattered across the header
+// and the loans page.
+window.openProfileModal = function() {
+    const user = AppState.currentUser;
+    if (!user) return;
+
+    const myLoans = (AppState.loans || []).filter(l => l.user_id === user.userId);
+    const borrowedListHtml = myLoans.length === 0
+        ? `<p class="uh-modal-empty">No books borrowed right now.</p>`
+        : myLoans.map(l => {
+            const metrics = evaluateLoanMetrics(l.borrowed_at);
+            return `<div class="uh-profile-row"><span>${l.book_title}</span><span style="${metrics.status !== 'NORMAL' ? 'color: var(--uh-red);' : ''}">${metrics.daysElapsed}d${metrics.status !== 'NORMAL' ? ' · OVERDUE' : ''}</span></div>`;
+        }).join('');
+
+    openModal('My Profile', `
+        <div class="uh-profile-row"><span>Name</span><span>${user.name}</span></div>
+        <div class="uh-profile-row"><span>Account Type</span><span>${user.accountType}</span></div>
+        ${user.estateBranch ? `<div class="uh-profile-row"><span>Estate</span><span>${user.estateBranch}</span></div>` : ''}
+        <div class="uh-profile-row"><span>Login ID</span><span>${user.userId}</span></div>
+        <h4 style="margin: 1.25rem 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: var(--text-dark);">Currently Borrowed (${myLoans.length})</h4>
+        ${borrowedListHtml}
+    `);
+};
+
+// Shared by openMessagesModal() and refreshMessagesBadge() so the count
+// on the menu icon and the modal contents never disagree.
+function computeAccountAlerts() {
+    const user = AppState.currentUser;
+    const myLoans = (AppState.loans || []).filter(l => user && l.user_id === user.userId);
+    const myReservations = AppState.reservations || [];
+
+    const alerts = [];
+    myLoans.forEach(l => {
+        const metrics = evaluateLoanMetrics(l.borrowed_at);
+        if (metrics.status === 'SUSPENDED') {
+            alerts.push({ type: 'warn', icon: 'fa-triangle-exclamation', html: `<strong>${l.book_title}</strong> is ${metrics.daysElapsed} days overdue and your account is frozen. Return it to clear the KSH ${metrics.fine} balance.` });
+        } else if (metrics.status === 'OVERDUE') {
+            alerts.push({ type: 'warn', icon: 'fa-clock', html: `<strong>${l.book_title}</strong> is overdue by ${metrics.daysElapsed - 21} day(s) — KSH ${metrics.fine} fine accrued.` });
+        }
+    });
+    myReservations.forEach(r => {
+        if (r.status === 'READY') {
+            alerts.push({ type: 'info', icon: 'fa-hand', html: `<strong>${r.book_title}</strong> is ready for pickup at ${r.branch} until ${new Date(r.expires_at).toLocaleDateString()}.` });
+        }
+    });
+    return alerts;
+}
+
+// Updates the small red count badge on the "Messages" menu item — safe to
+// call any time state changes (after login, after a sync), independent of
+// whether the modal is actually open.
+window.refreshMessagesBadge = function() {
+    const badge = document.getElementById('messages-badge');
+    if (!badge) return;
+    const count = computeAccountAlerts().length;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+};
+
+// "Messages" — a lightweight, computed alerts panel: overdue loans,
+// reservations ready for pickup. There's no persisted messages table yet
+// (that would be a separate backend feature) — this surfaces what the
+// system already knows about the account's current state.
+window.openMessagesModal = function() {
+    const alerts = computeAccountAlerts();
+    window.refreshMessagesBadge();
+
+    const bodyHtml = alerts.length === 0
+        ? `<p class="uh-modal-empty">You're all caught up — no alerts right now.</p>`
+        : alerts.map(a => `
+            <div class="uh-message-item">
+                <div class="uh-message-icon ${a.type}"><i class="fas ${a.icon}"></i></div>
+                <div class="uh-message-text">${a.html}</div>
+            </div>
+        `).join('');
+
+    openModal('Messages', bodyHtml);
+};
+
+// "Hot Reads" — same trending data used on the catalog page's highlight
+// strip, surfaced here too so it's reachable from anywhere via the menu.
+window.openHotReadsModal = function() {
+    const topBooks = (AppState.stats && AppState.stats.topBooks) || [];
+    const bodyHtml = topBooks.length === 0
+        ? `<p class="uh-modal-empty">No borrowing trends yet — check back once more books are out on loan.</p>`
+        : topBooks.map((b, i) => `
+            <div class="uh-hotread-item">
+                <span class="uh-hotread-rank">${i + 1}</span>
+                <div>
+                    <p style="font-weight:700; font-size:0.85rem;">${b.title}</p>
+                    <p class="text-xs text-secondary">${b.author ? `By ${b.author} · ` : ''}Borrowed ${b.timesBorrowed}× total</p>
+                </div>
+            </div>
+        `).join('');
+    openModal('Hot Reads', bodyHtml);
+};
+
 // Close the dropdown on outside click or Escape — standard menu behavior.
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('user-menu');
@@ -477,17 +616,20 @@ window.switchAuthTab = function(mode) {
     const loginPanel = document.getElementById('panel-login');
     const registerPanel = document.getElementById('panel-register');
     const verifyPanel = document.getElementById('panel-verify');
+    const forgotPanel = document.getElementById('panel-forgot');
+    const resetPanel = document.getElementById('panel-reset');
     const tabLogin = document.getElementById('tab-login');
     const tabRegister = document.getElementById('tab-register');
-    if (!panelsContainer || !loginPanel || !registerPanel || !verifyPanel) return;
+    if (!panelsContainer || !loginPanel || !registerPanel || !verifyPanel || !forgotPanel || !resetPanel) return;
 
-    const panelByMode = { login: loginPanel, register: registerPanel, verify: verifyPanel };
+    const panelByMode = { login: loginPanel, register: registerPanel, verify: verifyPanel, forgot: forgotPanel, reset: resetPanel };
     const target = panelByMode[mode] || loginPanel;
+    const allPanels = [loginPanel, registerPanel, verifyPanel, forgotPanel, resetPanel];
 
-    [loginPanel, registerPanel, verifyPanel].forEach(p => p.classList.toggle('active', p === target));
+    allPanels.forEach(p => p.classList.toggle('active', p === target));
 
     if (switcher) {
-        switcher.style.display = mode === 'verify' ? 'none' : 'flex';
+        switcher.style.display = (mode === 'login' || mode === 'register') ? 'flex' : 'none';
         switcher.classList.toggle('mode-register', mode === 'register');
     }
     if (tabLogin) tabLogin.classList.toggle('active', mode === 'login');
@@ -538,6 +680,7 @@ async function fetchRemoteIndexData() {
         saveStateToStorage();
     }
     configureLayoutVisibility();
+    if (typeof window.refreshMessagesBadge === 'function') window.refreshMessagesBadge();
 }
 
 // Transmits fine metrics, returns, and borrow transactions straight out to Google Sheets.

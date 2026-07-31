@@ -18,10 +18,10 @@ router.post('/', (req, res) => {
     return res.json({ authenticated: false, message: 'No account found for that email or phone number.' });
   }
   if (!account.verified) {
-    return res.json({ unverified: true, userId, message: 'This account has not been verified yet.' });
+    return res.json({ unverified: true, userId, verifyDestination: account.work_email || userId, message: 'This account has not been verified yet.' });
   }
   if (!safeEqual(passcodeHash, account.passcode_hash)) {
-    return res.json({ authenticated: false, message: 'Incorrect PIN.' });
+    return res.json({ authenticated: false, message: 'Incorrect password.' });
   }
 
   const user = {

@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { evaluateLoanMetrics, calculateAge } = require('../util');
+const { evaluateLoanMetrics } = require('../util');
 const { optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,16 +11,16 @@ const isAdultBracket = (bracket) => (bracket || '').toString().trim().toLowerCas
 router.post('/', optionalAuth, (req, res) => {
   const userId = (req.body?.userId || '').trim();
 
-  // Age-gate: accounts younger than 18 don't see Adults-bracket titles at
-  // all — filtered out here, server-side, so it can't be bypassed by
-  // editing the front end. Accounts with no date_of_birth on record (e.g.
-  // registered before this field existed) are treated as adult rather
-  // than locked out of content they could already see.
+  // Age-gate: accounts that self-declared under-18 at registration (the
+  // "I am 18 or older" checkbox left unchecked) don't see Adults-bracket
+  // titles at all — filtered out here, server-side, so it can't be
+  // bypassed by editing the front end. Accounts with no is_adult value on
+  // record (e.g. registered before this field existed) are treated as
+  // adult rather than locked out of content they could already see.
   let isMinor = false;
   if (userId) {
-    const account = db.prepare('SELECT date_of_birth FROM library_accounts WHERE user_id = ?').get(userId);
-    const age = account ? calculateAge(account.date_of_birth) : null;
-    isMinor = age !== null && age < 18;
+    const account = db.prepare('SELECT is_adult FROM library_accounts WHERE user_id = ?').get(userId);
+    isMinor = !!account && account.is_adult === 0;
   }
 
   const titleRows = db.prepare('SELECT * FROM library_titles').all()

@@ -346,3 +346,35 @@ h1, h2, h3, h4, .auth-title, .section-title, .hero-title, .logo-bold, .logo-ligh
 .sub-shimmer { height: 0.85rem; width: 45%; margin-bottom: 1.25rem; }
 .btn-shimmer { height: 2rem; width: 100%; }
 @keyframes skeletonMove { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+/* Checkbox label (age confirmation, etc.) */
+.checkbox-label { display: flex; align-items: center; gap: 0.55rem; font-size: 0.85rem; font-weight: 600; color: var(--text-dark); cursor: pointer; }
+.checkbox-label input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--uh-red); cursor: pointer; flex-shrink: 0; }
+
+/* Small unread-count badge on the Messages menu item */
+.menu-badge { background: var(--uh-red); color: #fff; font-size: 0.65rem; font-weight: 800; border-radius: 999px; padding: 0.1rem 0.45rem; margin-left: auto; }
+
+/* Generic modal — used for Profile / Messages / Hot Reads panels launched from the user menu */
+.uh-modal-overlay { position: fixed; inset: 0; background: rgba(20, 20, 30, 0.55); backdrop-filter: blur(2px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1.25rem; }
+.uh-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; max-height: 82vh; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,0.25); animation: uhModalPop 0.18s ease-out; }
+@keyframes uhModalPop { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.uh-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid #EDEAE4; }
+.uh-modal-header h3 { font-size: 1.05rem; font-weight: 800; color: var(--text-dark); margin: 0; }
+.uh-modal-close { background: none; border: none; font-size: 1rem; color: var(--text-secondary); cursor: pointer; padding: 0.35rem; line-height: 1; }
+.uh-modal-close:hover { color: var(--uh-red); }
+.uh-modal-body { padding: 1.4rem; overflow-y: auto; }
+.uh-modal-empty { text-align: center; font-size: 0.85rem; color: var(--text-secondary); font-style: italic; padding: 2.5rem 0; }
+.uh-profile-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0; border-bottom: 1px solid #F5F3EE; font-size: 0.85rem; }
+.uh-profile-row:last-child { border-bottom: none; }
+.uh-profile-row span:first-child { color: var(--text-secondary); font-weight: 600; }
+.uh-profile-row span:last-child { color: var(--text-dark); font-weight: 700; text-align: right; }
+.uh-message-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid #F5F3EE; }
+.uh-message-item:last-child { border-bottom: none; }
+.uh-message-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+.uh-message-icon.warn { background: rgba(214,35,39,0.1); color: var(--uh-red); }
+.uh-message-icon.info { background: rgba(38,166,154,0.12); color: #26A69A; }
+.uh-message-text { font-size: 0.82rem; color: var(--text-dark); line-height: 1.4; }
+.uh-message-text strong { font-weight: 800; }
+.uh-hotread-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid #F5F3EE; }
+.uh-hotread-item:last-child { border-bottom: none; }
+.uh-hotread-rank { font-size: 1.1rem; font-weight: 900; color: var(--uh-red); width: 1.6rem; flex-shrink: 0; }

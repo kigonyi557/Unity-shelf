@@ -37,9 +37,13 @@
                     </button>
                     <div class="user-menu-panel" id="user-menu-panel">
                         <button id="nav-admin-link" onclick="closeUserMenu(); router.navigate('admin')" class="user-menu-item" style="display: none;"><i class="fas fa-user-shield"></i> Admin Dashboard</button>
+                        <button onclick="closeUserMenu(); openProfileModal()" class="user-menu-item"><i class="fas fa-id-card"></i> My Profile</button>
+                        <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> Active Loans</button>
+                        <button onclick="closeUserMenu(); openMessagesModal()" class="user-menu-item"><i class="fas fa-bell"></i> Messages<span id="messages-badge" class="menu-badge" style="display:none;"></span></button>
+                        <button onclick="closeUserMenu(); openHotReadsModal()" class="user-menu-item"><i class="fas fa-fire"></i> Hot Reads</button>
+                        <div class="user-menu-divider"></div>
                         <button onclick="closeUserMenu(); router.navigate('catalog')" class="user-menu-item"><i class="fas fa-book-open"></i> Browse Catalog</button>
-                        <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> My Loans</button>
-                        <button onclick="closeUserMenu(); router.navigate('changepin')" class="user-menu-item"><i class="fas fa-key"></i> Change PIN</button>
+                        <button onclick="closeUserMenu(); router.navigate('changepin')" class="user-menu-item"><i class="fas fa-key"></i> Change Password</button>
                         <div class="user-menu-divider"></div>
                         <button onclick="closeUserMenu(); handleLogout()" class="user-menu-item user-menu-item-danger"><i class="fas fa-sign-out-alt"></i> Log Out</button>
                     </div>
@@ -85,10 +89,10 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label" for="signin-pass">Security PIN</label>
+                                    <label class="form-label" for="signin-pass">Password</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-key input-icon"></i>
-                                        <input type="password" id="signin-pass" class="form-input" placeholder="••••" required>
+                                        <input type="password" id="signin-pass" class="form-input" placeholder="Enter your password" required>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-uh-primary mt-2">Log In</button>
@@ -139,12 +143,26 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label" for="signup-dob">Date of Birth</label>
+                                    <label class="checkbox-label" for="signup-is-adult">
+                                        <input type="checkbox" id="signup-is-adult">
+                                        I confirm I am 18 years of age or older
+                                    </label>
+                                    <p class="field-hint">Leave unchecked if under 18 — adult-category titles will be hidden from your catalog view.</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-password">Password</label>
                                     <div class="input-wrapper">
-                                        <i class="fas fa-cake-candles input-icon"></i>
-                                        <input type="date" id="signup-dob" class="form-input" required>
+                                        <i class="fas fa-lock input-icon"></i>
+                                        <input type="password" id="signup-password" class="form-input" placeholder="Min. 6 characters" minlength="6" required>
                                     </div>
-                                    <p class="field-hint">Used to keep age-restricted titles out of under-18 catalogs. Not shared publicly.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-password-confirm">Confirm Password</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-lock input-icon"></i>
+                                        <input type="password" id="signup-password-confirm" class="form-input" placeholder="Re-enter password" minlength="6" required>
+                                    </div>
                                 </div>
 
                                 <div class="form-group" id="staff-email-group" style="display: none;">
@@ -168,6 +186,14 @@
                                         <i class="fas fa-phone input-icon"></i>
                                         <input type="tel" id="signup-phone" class="form-input" placeholder="e.g. 07XXXXXXXX">
                                     </div>
+                                </div>
+                                <div class="form-group" id="resident-email-group" style="display: none;">
+                                    <label class="form-label" for="signup-email">Email Address</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-envelope input-icon"></i>
+                                        <input type="email" id="signup-email" class="form-input" placeholder="you@example.com">
+                                    </div>
+                                    <p class="field-hint">We'll send your verification code here.</p>
                                 </div>
 
                                 <button type="submit" class="btn btn-uh-secondary mt-2">Register Account</button>
@@ -309,35 +335,35 @@
         <section class="section-padding container">
             <div class="section-header text-center">
                 <span class="section-meta">ACCOUNT SECURITY</span>
-                <h2 class="section-title">Change Your Security PIN</h2>
-                <p class="hero-subtitle" style="margin-top: 0.5rem;">Every new account starts on the shared default PIN. Set your own so only you can access your account.</p>
+                <h2 class="section-title">Change Your Password</h2>
+                <p class="hero-subtitle" style="margin-top: 0.5rem;">Update your password any time — you'll need your current one first.</p>
             </div>
 
             <div class="auth-grid mt-6" style="max-width: 500px;">
                 <div class="auth-card">
                     <form onsubmit="handleChangePinAttempt(event)" class="contact-form-matrix">
                         <div class="form-group">
-                            <label class="form-label" for="changepin-current">Current PIN</label>
+                            <label class="form-label" for="changepin-current">Current Password</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-key input-icon"></i>
-                                <input type="password" id="changepin-current" class="form-input" placeholder="Current PIN" required>
+                                <input type="password" id="changepin-current" class="form-input" placeholder="Current password" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="changepin-new">New PIN</label>
+                            <label class="form-label" for="changepin-new">New Password</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-lock input-icon"></i>
-                                <input type="password" id="changepin-new" class="form-input" placeholder="New PIN (min. 4 characters)" required>
+                                <input type="password" id="changepin-new" class="form-input" placeholder="New password (min. 6 characters)" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="changepin-confirm">Confirm New PIN</label>
+                            <label class="form-label" for="changepin-confirm">Confirm New Password</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-lock input-icon"></i>
-                                <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new PIN" required>
+                                <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new password" required>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-uh-primary mt-2">Update PIN</button>
+                        <button type="submit" class="btn btn-uh-primary mt-2">Update Password</button>
                     </form>
                 </div>
             </div>
@@ -386,6 +412,16 @@
             <p>&copy; 2026 Unity Shelf — a Unity Homes Library System. All transaction records safely secured.</p>
         </div>
     </footer>
+
+    <div class="uh-modal-overlay" id="uh-modal-overlay" onclick="if(event.target===this) closeActiveModal()" style="display:none;">
+        <div class="uh-modal">
+            <div class="uh-modal-header">
+                <h3 id="uh-modal-title">Modal Title</h3>
+                <button class="uh-modal-close" onclick="closeActiveModal()" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="uh-modal-body" id="uh-modal-body"></div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

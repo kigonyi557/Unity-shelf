@@ -44,19 +44,4 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-// Computes age in whole years from a 'YYYY-MM-DD' date of birth. Returns
-// null for missing/invalid input — callers should decide how to treat an
-// unknown age (this codebase treats "unknown" as "don't restrict", so
-// accounts created before date_of_birth existed aren't locked out of
-// content they could already see).
-function calculateAge(dobStr, asOf = new Date()) {
-  if (!dobStr) return null;
-  const dob = new Date(dobStr);
-  if (isNaN(dob.getTime())) return null;
-  let age = asOf.getFullYear() - dob.getFullYear();
-  const monthDiff = asOf.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && asOf.getDate() < dob.getDate())) age--;
-  return age;
-}
-
-module.exports = { genId, genVerificationCode, sha256Hex, evaluateLoanMetrics, safeEqual, calculateAge };
+module.exports = { genId, genVerificationCode, sha256Hex, evaluateLoanMetrics, safeEqual };

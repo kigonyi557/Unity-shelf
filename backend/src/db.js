@@ -22,6 +22,7 @@ db.exec(`
     unit_number       TEXT,
     phone             TEXT,
     date_of_birth     TEXT,
+    is_adult          INTEGER,
     passcode_hash     TEXT NOT NULL,
     verified          INTEGER NOT NULL DEFAULT 0,
     registered_date   TEXT NOT NULL
@@ -91,6 +92,9 @@ db.exec(`
 const accountColumns = db.prepare(`PRAGMA table_info(library_accounts)`).all();
 if (!accountColumns.some(c => c.name === 'date_of_birth')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN date_of_birth TEXT`);
+}
+if (!accountColumns.some(c => c.name === 'is_adult')) {
+  db.exec(`ALTER TABLE library_accounts ADD COLUMN is_adult INTEGER`);
 }
 
 module.exports = db;

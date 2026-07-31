@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { evaluateLoanMetrics } = require('../util');
 const { requireAuth } = require('../middleware/auth');
+const { sendMail } = require('../email');
 
 const router = express.Router();
 const HOLD_HOURS = 48; // how long a promoted reservation stays claimable before it's fair game again
@@ -75,6 +76,17 @@ function handleReturn(req, res, data) {
       UPDATE library_reservations SET status = 'READY', copy_id = ?, ready_at = ?, expires_at = ? WHERE reservation_id = ?
     `).run(copyId, readyAt, expiresAt, nextWaiting.reservation_id);
     db.prepare('UPDATE library_copies SET status = ? WHERE copy_id = ?').run('RESERVED', copyId);
+
+    // Best-effort notification — a failed send shouldn't roll back the
+    // return itself, so this isn't awaited into the response path.
+    const account = db.prepare('SELECT name, work_email FROM library_accounts WHERE user_id = ?').get(nextWaiting.user_id);
+    if (account?.work_email) {
+      sendMail({
+        to: account.work_email,
+        subject: `Ready for pickup: ${loan.book_title}`,
+        text: `Hi ${account.name},\n\nGood news — "${loan.book_title}" is ready for pickup at ${loan.branch}.\n\nIt's being held for you until ${new Date(expiresAt).toLocaleString()}. After that it goes back to general availability, so please pick it up before then.\n\nThe Unity Shelf`,
+      }).catch(() => {});
+    }
   } else {
     db.prepare('UPDATE library_copies SET status = ? WHERE copy_id = ?').run('AVAILABLE', copyId);
   }

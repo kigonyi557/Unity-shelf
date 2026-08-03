@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { safeEqual } = require('../util');
@@ -17,9 +17,6 @@ router.post('/', (req, res) => {
   if (!account) {
     return res.json({ authenticated: false, message: 'No account found for that email or phone number.' });
   }
-  if (!account.verified) {
-    return res.json({ unverified: true, userId, verifyDestination: account.work_email || userId, message: 'This account has not been verified yet.' });
-  }
   if (!safeEqual(passcodeHash, account.passcode_hash)) {
     return res.json({ authenticated: false, message: 'Incorrect password.' });
   }
@@ -32,7 +29,12 @@ router.post('/', (req, res) => {
   };
   const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '12h' });
 
-  res.json({ authenticated: true, user, token });
+  res.json({
+    authenticated: true,
+    user,
+    token,
+    mustChangePassword: !!account.must_change_password,
+  });
 });
 
 module.exports = router;

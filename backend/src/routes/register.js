@@ -1,27 +1,28 @@
-const express = require('express');
+﻿const express = require('express');
 const db = require('../db');
 const { genVerificationCode, sha256Hex } = require('../util');
-const { sendVerificationCode } = require('../notify');
 
 const router = express.Router();
 const VALID_TYPES = ['Resident', 'Staff', 'Library Assistant'];
 const STAFF_DOMAIN = '@unityhomes.co.ke';
-const CODE_TTL_MINUTES = 15;
 const EMAIL_FORMAT = /^\S+@\S+\.\S+$/;
 
 // POST /webhook/library-registration
+// No verification codes anymore. Every account is created with a
+// server-generated default PIN and must_change_password = 1. Staff hand
+// the default PIN to the resident directly; the first successful login
+// forces them into a "create your own password" screen.
 router.post('/', async (req, res) => {
   const b = req.body || {};
-  const { name, estateBranch, accountType, passcodeHash, workEmail, email, unitNumber, phone, isAdult } = b;
+  const { name, estateBranch, accountType, workEmail, email, unitNumber, phone, isAdult } = b;
 
-  if (!name || !accountType || !passcodeHash || !VALID_TYPES.includes(accountType)) {
+  if (!name || !accountType || !VALID_TYPES.includes(accountType)) {
     return res.status(400).json({ success: false, message: 'Missing or invalid registration fields.' });
   }
 
   const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
   let userId;
-  let verificationEmail;
-  let verificationPhone = null;
+  let contactEmail = null;
 
   if (isStaffLike) {
     const workEmailNorm = (workEmail || '').trim().toLowerCase();
@@ -29,16 +30,17 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: `${accountType} accounts require a work email ending in ${STAFF_DOMAIN}.` });
     }
     userId = workEmailNorm;
-    verificationEmail = workEmailNorm;
+    contactEmail = workEmailNorm;
   } else {
     if (!phone) return res.status(400).json({ success: false, message: 'Phone number is required for resident accounts.' });
-    const emailNorm = (email || '').trim().toLowerCase();
-    if (!EMAIL_FORMAT.test(emailNorm)) {
-      return res.status(400).json({ success: false, message: 'A valid email address is required to receive your verification code.' });
-    }
     userId = phone.trim();
-    verificationEmail = emailNorm;
-    verificationPhone = phone.trim();
+    const emailNorm = (email || '').trim().toLowerCase();
+    if (emailNorm) {
+      if (!EMAIL_FORMAT.test(emailNorm)) {
+        return res.status(400).json({ success: false, message: 'That email address does not look valid.' });
+      }
+      contactEmail = emailNorm;
+    }
   }
 
   const existing = db.prepare('SELECT user_id FROM library_accounts WHERE user_id = ?').get(userId);
@@ -46,41 +48,19 @@ router.post('/', async (req, res) => {
     return res.status(409).json({ success: false, message: 'An account already exists for that email or phone number.' });
   }
 
-  // Everyone now registers with a real email (residents provide one
-  // separately from their phone/login-id; staff use their work email for
-  // both). That means every account can go through genuine email
-  // verification — no more auto-verify bypass for residents.
+  const defaultPin = genVerificationCode();
+  const passcodeHash = sha256Hex(`${userId}::${defaultPin}`);
+
   db.prepare(`
-    INSERT INTO library_accounts (user_id, name, account_type, estate_branch, work_email, unit_number, phone, is_adult, passcode_hash, verified, registered_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-  `).run(userId, name, accountType, estateBranch || null, verificationEmail, unitNumber || null, isStaffLike ? null : userId, isAdult ? 1 : 0, passcodeHash, new Date().toISOString());
-
-  const code = genVerificationCode();
-  const expires_at = new Date(Date.now() + CODE_TTL_MINUTES * 60000).toISOString();
-  db.prepare(`
-    INSERT INTO library_verification_codes (user_id, code_hash, expires_at, attempts, created_at)
-    VALUES (?, ?, ?, 0, ?)
-    ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0, created_at=excluded.created_at
-  `).run(userId, sha256Hex(code), expires_at, new Date().toISOString());
-
-  const { channel } = await sendVerificationCode({
-    name,
-    phone: verificationPhone,
-    email: verificationEmail,
-    code,
-    ttlMinutes: CODE_TTL_MINUTES,
-  });
-
-  const destination = channel === 'email' ? verificationEmail : (verificationPhone || verificationEmail);
+    INSERT INTO library_accounts (user_id, name, account_type, estate_branch, work_email, unit_number, phone, is_adult, passcode_hash, verified, must_change_password, registered_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)
+  `).run(userId, name, accountType, estateBranch || null, contactEmail, unitNumber || null, isStaffLike ? null : userId, isAdult ? 1 : 0, passcodeHash, new Date().toISOString());
 
   res.json({
     success: true,
     userId,
-    verifyDestination: destination,
-    verifyChannel: channel,
-    message: channel
-      ? `Account created — check ${destination} (${channel}) for your verification code.`
-      : `Account created, but we couldn't deliver your verification code. Please contact support.`,
+    defaultPin,
+    message: `Account created. Default PIN: ${defaultPin}. Please hand this to the user directly — they'll be asked to set their own password on first login.`,
   });
 });
 

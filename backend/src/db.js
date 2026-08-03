@@ -1,4 +1,4 @@
-const path = require('path');
+﻿const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
@@ -85,16 +85,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_res_user ON library_reservations(user_id);
 `);
 
-// Runtime migration: databases created before date_of_birth existed (e.g.
-// the already-live production DB) won't have this column yet — CREATE
-// TABLE IF NOT EXISTS above only affects brand-new databases. Add it here
-// if missing, so existing accounts and data are preserved.
 const accountColumns = db.prepare(`PRAGMA table_info(library_accounts)`).all();
 if (!accountColumns.some(c => c.name === 'date_of_birth')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN date_of_birth TEXT`);
 }
 if (!accountColumns.some(c => c.name === 'is_adult')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN is_adult INTEGER`);
+}
+if (!accountColumns.some(c => c.name === 'must_change_password')) {
+  db.exec(`ALTER TABLE library_accounts ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
 }
 
 module.exports = db;

@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const db = require('../db');
 const { safeEqual } = require('../util');
 const { requireAuth } = require('../middleware/auth');
@@ -20,7 +20,7 @@ router.post('/', requireAuth, (req, res) => {
     return res.status(400).json({ success: false, message: 'Current PIN is incorrect.' });
   }
 
-  db.prepare('UPDATE library_accounts SET passcode_hash = ? WHERE user_id = ?').run(newPasscodeHash, userId);
+  db.prepare('UPDATE library_accounts SET passcode_hash = ?, must_change_password = 0 WHERE user_id = ?').run(newPasscodeHash, userId);
   res.json({ success: true });
 });
 

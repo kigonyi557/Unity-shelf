@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { genVerificationCode, sha256Hex } = require('../util');
-const { sendMail } = require('../email');
+const { sendVerificationCode } = require('../notify');
 
 const router = express.Router();
 const VALID_TYPES = ['Resident', 'Staff', 'Library Assistant'];
@@ -21,6 +21,7 @@ router.post('/', async (req, res) => {
   const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
   let userId;
   let verificationEmail;
+  let verificationPhone = null;
 
   if (isStaffLike) {
     const workEmailNorm = (workEmail || '').trim().toLowerCase();
@@ -37,6 +38,7 @@ router.post('/', async (req, res) => {
     }
     userId = phone.trim();
     verificationEmail = emailNorm;
+    verificationPhone = phone.trim();
   }
 
   const existing = db.prepare('SELECT user_id FROM library_accounts WHERE user_id = ?').get(userId);
@@ -61,17 +63,24 @@ router.post('/', async (req, res) => {
     ON CONFLICT(user_id) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0, created_at=excluded.created_at
   `).run(userId, sha256Hex(code), expires_at, new Date().toISOString());
 
-  await sendMail({
-    to: verificationEmail,
-    subject: 'Verify your Unity Shelf account',
-    text: `Hi ${name},\n\nYour verification code is: ${code}\n\nIt expires in ${CODE_TTL_MINUTES} minutes.\n\nThe Unity Shelf`,
+  const { channel } = await sendVerificationCode({
+    name,
+    phone: verificationPhone,
+    email: verificationEmail,
+    code,
+    ttlMinutes: CODE_TTL_MINUTES,
   });
+
+  const destination = channel === 'email' ? verificationEmail : (verificationPhone || verificationEmail);
 
   res.json({
     success: true,
     userId,
-    verifyDestination: verificationEmail,
-    message: `Account created — check ${verificationEmail} for your verification code.`,
+    verifyDestination: destination,
+    verifyChannel: channel,
+    message: channel
+      ? `Account created — check ${destination} (${channel}) for your verification code.`
+      : `Account created, but we couldn't deliver your verification code. Please contact support.`,
   });
 });
 

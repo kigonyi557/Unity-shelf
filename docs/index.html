@@ -94,7 +94,6 @@
                                         <i class="fas fa-key input-icon"></i>
                                         <input type="password" id="signin-pass" class="form-input" placeholder="Enter your password" required>
                                     </div>
-                                    <p class="field-hint" style="text-align: right;"><a href="#" onclick="event.preventDefault(); switchAuthTab('forgot')">Forgot password?</a></p>
                                 </div>
                                 <button type="submit" class="btn btn-uh-primary mt-2">Log In</button>
                                 <p class="auth-switch-hint">New here? <a href="#" onclick="event.preventDefault(); switchAuthTab('register')">Create an account</a></p>
@@ -151,21 +150,6 @@
                                     <p class="field-hint">Leave unchecked if under 18 — adult-category titles will be hidden from your catalog view.</p>
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="form-label" for="signup-password">Password</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-lock input-icon"></i>
-                                        <input type="password" id="signup-password" class="form-input" placeholder="Min. 6 characters" minlength="6" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="signup-password-confirm">Confirm Password</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-lock input-icon"></i>
-                                        <input type="password" id="signup-password-confirm" class="form-input" placeholder="Re-enter password" minlength="6" required>
-                                    </div>
-                                </div>
-
                                 <div class="form-group" id="staff-email-group" style="display: none;">
                                     <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag">[@unityhomes.co.ke]</span></label>
                                     <div class="input-wrapper">
@@ -189,12 +173,12 @@
                                     </div>
                                 </div>
                                 <div class="form-group" id="resident-email-group" style="display: none;">
-                                    <label class="form-label" for="signup-email">Email Address</label>
+                                    <label class="form-label" for="signup-email">Email Address <span class="pk-tag">(optional)</span></label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-envelope input-icon"></i>
                                         <input type="email" id="signup-email" class="form-input" placeholder="you@example.com">
                                     </div>
-                                    <p class="field-hint">We'll send your verification code here.</p>
+                                    <p class="field-hint">Used for account recovery only — not required to register.</p>
                                 </div>
 
                                 <button type="submit" class="btn btn-uh-secondary mt-2">Register Account</button>
@@ -204,75 +188,28 @@
 
                         <div class="auth-panel" id="panel-verify">
                             <div class="card-header">
-                                <div class="icon-badge icon-badge-3"><i class="fas fa-shield-halved"></i></div>
-                                <h3 class="auth-title">Verify Your Account</h3>
-                                <p class="auth-subtitle" id="verify-subtitle">Enter the code we sent you</p>
+                                <div class="icon-badge icon-badge-3"><i class="fas fa-circle-check"></i></div>
+                                <h3 class="auth-title">Account Created</h3>
+                                <p class="auth-subtitle">Here is your default login PIN</p>
                             </div>
-                            <form onsubmit="handleVerifyAccount(event)" class="contact-form-matrix">
-                                <input type="hidden" id="verify-userid">
+                            <div class="contact-form-matrix">
                                 <div class="form-group">
-                                    <label class="form-label" for="verify-code">Verification Code</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-hashtag input-icon"></i>
-                                        <input type="text" id="verify-code" class="form-input" placeholder="6-digit code" required>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-uh-primary mt-2">Verify</button>
-                                <p class="auth-switch-hint">Wrong details? <a href="#" onclick="event.preventDefault(); switchAuthTab('register')">Start over</a></p>
-                            </form>
-                        </div>
-
-                        <div class="auth-panel" id="panel-forgot">
-                            <div class="card-header">
-                                <div class="icon-badge icon-badge-3"><i class="fas fa-key"></i></div>
-                                <h3 class="auth-title">Forgot Password</h3>
-                                <p class="auth-subtitle">Enter your email or phone to get a reset code</p>
-                            </div>
-                            <form onsubmit="handleForgotPasswordRequest(event)" class="contact-form-matrix">
-                                <div class="form-group">
-                                    <label class="form-label" for="forgot-id">Email or Phone Number</label>
+                                    <label class="form-label" for="verify-userid-display">Your Login ID</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-address-book input-icon"></i>
-                                        <input type="text" id="forgot-id" class="form-input" placeholder="Work email or phone number" required>
+                                        <input type="text" id="verify-userid-display" class="form-input" readonly>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-uh-primary mt-2">Send Reset Code</button>
-                                <p class="auth-switch-hint">Remembered it? <a href="#" onclick="event.preventDefault(); switchAuthTab('login')">Log in</a></p>
-                            </form>
-                        </div>
-
-                        <div class="auth-panel" id="panel-reset">
-                            <div class="card-header">
-                                <div class="icon-badge icon-badge-3"><i class="fas fa-lock"></i></div>
-                                <h3 class="auth-title">Reset Password</h3>
-                                <p class="auth-subtitle" id="reset-subtitle">Enter the code we sent you and a new password</p>
+                                <div class="form-group">
+                                    <label class="form-label" for="verify-pin-display">Default PIN</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-key input-icon"></i>
+                                        <input type="text" id="verify-pin-display" class="form-input" readonly>
+                                    </div>
+                                    <p class="field-hint">Write this down now — you'll be asked to set your own password the first time you log in.</p>
+                                </div>
+                                <button type="button" class="btn btn-uh-primary mt-2" onclick="switchAuthTab('login')">Continue to Log In</button>
                             </div>
-                            <form onsubmit="handleResetPasswordSubmit(event)" class="contact-form-matrix">
-                                <input type="hidden" id="reset-userid">
-                                <div class="form-group">
-                                    <label class="form-label" for="reset-code">Reset Code</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-hashtag input-icon"></i>
-                                        <input type="text" id="reset-code" class="form-input" placeholder="6-digit code" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="reset-new-password">New Password</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-lock input-icon"></i>
-                                        <input type="password" id="reset-new-password" class="form-input" placeholder="Min. 6 characters" minlength="6" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="reset-confirm-password">Confirm New Password</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-lock input-icon"></i>
-                                        <input type="password" id="reset-confirm-password" class="form-input" placeholder="Re-enter new password" minlength="6" required>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-uh-primary mt-2">Update Password</button>
-                                <p class="auth-switch-hint">Wrong details? <a href="#" onclick="event.preventDefault(); switchAuthTab('forgot')">Start over</a></p>
-                            </form>
                         </div>
                     </div>
                 </div>

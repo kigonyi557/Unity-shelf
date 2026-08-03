@@ -8,8 +8,6 @@ const CONFIG = {
     N8N_TRANSACTION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-update",
     N8N_CHANGE_PIN_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-change-pin",
     N8N_VERIFY_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-verify-account",
-    N8N_FORGOT_PASSWORD_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-forgot-password",
-    N8N_RESET_PASSWORD_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-reset-password",
     N8N_RESERVE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-reserve",
     N8N_CANCEL_RESERVATION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-cancel-reservation",
     N8N_ADMIN_OVERVIEW_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-admin-overview",
@@ -56,6 +54,7 @@ let AppState = {
     currentUser: null,
     authToken: null,
     offlineMode: false,
+    forcePasswordChange: false,
     stats: null
 };
 
@@ -182,22 +181,23 @@ window.handleLoginAttempt = async function(event) {
             AppState.currentUser = result.user;
             AppState.authToken = result.token || null;
             AppState.offlineMode = false;
+            // Accounts created with a server-issued default PIN must set
+            // their own password before they can use the rest of the app.
+            AppState.forcePasswordChange = !!result.mustChangePassword;
             saveStateToStorage();
             configureLayoutVisibility();
+
+            if (AppState.forcePasswordChange) {
+                showToast('🔑 First time logging in — please set your own password.');
+                router.navigate('changepin');
+                return;
+            }
+
             showToast(`Welcome back, ${result.user.name}`);
             await fetchRemoteIndexData(); // Sync live sheets library records
             // Library Assistants land on the admin overview instead of
             // the resident-facing catalog — different job, different home screen.
             router.navigate(result.user.accountType === 'Library Assistant' ? 'admin' : 'catalog');
-            return;
-        }
-        if (result.unverified) {
-            showToast(`⚠️ ${result.message}`);
-            switchAuthTab('verify');
-            const verifyUserIdField = document.getElementById('verify-userid');
-            const verifySubtitle = document.getElementById('verify-subtitle');
-            if (verifyUserIdField) verifyUserIdField.value = result.userId || userIdInput;
-            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${result.verifyDestination || result.userId || userIdInput}`;
             return;
         }
         showToast(`❌ Login Failed: ${result.message || 'Check your entries.'}`);
@@ -253,9 +253,10 @@ window.toggleRegistrationFields = function(accountType) {
 
 // Handles form submission when creating a new user profile. Staff register
 // with a work email (must match the company domain); residents register
-// with a Unit Number, phone number (their login ID), and a separate email
-// address (used only to deliver the verification code). Everyone sets
-// their own password here rather than starting on a shared default.
+// with a Unit Number and phone number (their login ID). Nobody sets a
+// password here — the server generates a default PIN and returns it in
+// the response; the account is forced to set its own password on first
+// login instead.
 window.handleRegistrationAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -263,17 +264,6 @@ window.handleRegistrationAttempt = async function(event) {
     const accountTypeInput = document.getElementById('signup-affiliation').value;
     const nameInput = document.getElementById('signup-name').value.trim();
     const isAdultInput = document.getElementById('signup-is-adult').checked;
-    const pinInput = document.getElementById('signup-password').value;
-    const pinConfirmInput = document.getElementById('signup-password-confirm').value;
-
-    if (pinInput.length < 6) {
-        showToast('❌ Password must be at least 6 characters.');
-        return;
-    }
-    if (pinInput !== pinConfirmInput) {
-        showToast('❌ Passwords do not match.');
-        return;
-    }
 
     const isStaffLike = accountTypeInput === 'Staff' || accountTypeInput === 'Library Assistant';
     let userIdInput = '';
@@ -281,7 +271,6 @@ window.handleRegistrationAttempt = async function(event) {
     let unitInput = '';
     let phoneInput = '';
     let emailInput = '';
-    const EMAIL_FORMAT = /^\S+@\S+\.\S+$/;
 
     if (isStaffLike) {
         workEmailInput = document.getElementById('signup-work-email').value.trim().toLowerCase();
@@ -294,8 +283,8 @@ window.handleRegistrationAttempt = async function(event) {
         unitInput = document.getElementById('signup-unit').value.trim();
         phoneInput = document.getElementById('signup-phone').value.trim();
         emailInput = document.getElementById('signup-email').value.trim().toLowerCase();
-        if (!EMAIL_FORMAT.test(emailInput)) {
-            showToast('❌ A valid email address is required — that\'s where your verification code goes.');
+        if (!phoneInput) {
+            showToast('❌ A phone number is required — it doubles as your login ID.');
             return;
         }
         userIdInput = phoneInput;
@@ -304,14 +293,12 @@ window.handleRegistrationAttempt = async function(event) {
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving..."; }
 
     try {
-        const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
         const registrationPayload = {
-            name: nameInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash,
+            name: nameInput, estateBranch: estateInput, accountType: accountTypeInput,
             workEmail: workEmailInput, email: emailInput, unitNumber: unitInput, phone: phoneInput, isAdult: isAdultInput,
             registeredAt: new Date().toISOString()
         };
 
-        // Post registration fields to n8n database sheet writer
         const response = await fetch(CONFIG.N8N_REGISTER_WEBHOOK, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -320,68 +307,19 @@ window.handleRegistrationAttempt = async function(event) {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, isAdult: isAdultInput });
-            saveStateToStorage();
-            showToast(`🎉 ${result.message || 'Account created.'}`);
+            showToast(`🎉 Account created for ${nameInput}.`);
             switchAuthTab('verify');
-            const verifyUserIdField = document.getElementById('verify-userid');
-            const verifySubtitle = document.getElementById('verify-subtitle');
-            const verifyDestination = result.verifyDestination || emailInput || workEmailInput || result.userId || userIdInput;
+            const verifyUserIdField = document.getElementById('verify-userid-display');
+            const verifyPinField = document.getElementById('verify-pin-display');
             if (verifyUserIdField) verifyUserIdField.value = result.userId || userIdInput;
-            if (verifySubtitle) verifySubtitle.textContent = `Enter the code we sent to ${verifyDestination}`;
+            if (verifyPinField) verifyPinField.value = result.defaultPin || '(ask staff for your PIN)';
         } else {
             showToast(`❌ Registration Error: ${result.message || 'Server rejected creation.'}`);
         }
     } catch (error) {
-        const keyCollision = AppState.registeredUsers.some(u => u.userId === userIdInput);
-        if (keyCollision) {
-            showToast("❌ An account already exists for that email/phone inside local memory cache.");
-        } else {
-            const passcodeHash = await saltedPasscodeHash(userIdInput, pinInput);
-            AppState.registeredUsers.push({ name: nameInput, userId: userIdInput, estateBranch: estateInput, accountType: accountTypeInput, passcodeHash, isAdult: isAdultInput });
-            saveStateToStorage();
-            showToast(`⚠️ Network unavailable: Saved profile to local cache. You'll need to verify once back online.`);
-        }
+        showToast("❌ Network unavailable — registration requires a connection.");
     } finally {
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Register Account"; }
-    }
-};
-
-// Handles the verification-code form (shown right after registration, or
-// when a login attempt comes back unverified). Confirms the code the
-// person received by email/SMS and unlocks their account for login.
-window.handleVerifyAccount = async function(event) {
-    event.preventDefault();
-    const submitBtn = event.target.querySelector('button[type="submit"]');
-    const userId = document.getElementById('verify-userid').value.trim();
-    const code = document.getElementById('verify-code').value.trim();
-
-    if (!userId) {
-        showToast("❌ Missing account reference — please register or log in again.");
-        return;
-    }
-
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Verifying..."; }
-
-    try {
-        const response = await fetch(CONFIG.N8N_VERIFY_WEBHOOK, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, code })
-        });
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            showToast("✅ Account verified — you can now log in.");
-            switchAuthTab('login');
-            document.getElementById('signin-id').value = userId;
-        } else {
-            showToast(`❌ ${result.message || 'Verification failed.'}`);
-        }
-    } catch (error) {
-        showToast("❌ Network unavailable — verification requires a connection.");
-    } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Verify"; }
     }
 };
 
@@ -426,9 +364,18 @@ window.handleChangePinAttempt = async function(event) {
         if (response.ok && result.success) {
             const cachedIdx = AppState.registeredUsers.findIndex(u => u.userId === userId);
             if (cachedIdx !== -1) AppState.registeredUsers[cachedIdx].passcodeHash = newPasscodeHash;
+            const wasForced = AppState.forcePasswordChange;
+            AppState.forcePasswordChange = false;
             saveStateToStorage();
             showToast("✅ Password updated successfully.");
-            router.navigate('dashboard');
+            if (wasForced) {
+                // First-login flow: send them into the app proper now that
+                // they've set their own password, instead of a generic dashboard.
+                await fetchRemoteIndexData();
+                router.navigate(AppState.currentUser.accountType === 'Library Assistant' ? 'admin' : 'catalog');
+            } else {
+                router.navigate('dashboard');
+            }
         } else {
             showToast(`❌ ${result.message || 'Could not update PIN.'}`);
         }
@@ -616,20 +563,17 @@ window.switchAuthTab = function(mode) {
     const loginPanel = document.getElementById('panel-login');
     const registerPanel = document.getElementById('panel-register');
     const verifyPanel = document.getElementById('panel-verify');
-    const forgotPanel = document.getElementById('panel-forgot');
-    const resetPanel = document.getElementById('panel-reset');
     const tabLogin = document.getElementById('tab-login');
     const tabRegister = document.getElementById('tab-register');
-    if (!panelsContainer || !loginPanel || !registerPanel || !verifyPanel || !forgotPanel || !resetPanel) return;
+    if (!panelsContainer || !loginPanel || !registerPanel || !verifyPanel) return;
 
-    const panelByMode = { login: loginPanel, register: registerPanel, verify: verifyPanel, forgot: forgotPanel, reset: resetPanel };
+    const panelByMode = { login: loginPanel, register: registerPanel, verify: verifyPanel };
     const target = panelByMode[mode] || loginPanel;
-    const allPanels = [loginPanel, registerPanel, verifyPanel, forgotPanel, resetPanel];
 
-    allPanels.forEach(p => p.classList.toggle('active', p === target));
+    [loginPanel, registerPanel, verifyPanel].forEach(p => p.classList.toggle('active', p === target));
 
     if (switcher) {
-        switcher.style.display = (mode === 'login' || mode === 'register') ? 'flex' : 'none';
+        switcher.style.display = mode === 'verify' ? 'none' : 'flex';
         switcher.classList.toggle('mode-register', mode === 'register');
     }
     if (tabLogin) tabLogin.classList.toggle('active', mode === 'login');
@@ -808,6 +752,9 @@ window.goToHeroSlide = function(index) {
 const router = {
     navigate: async (view) => {
         if (!AppState.isAuthenticated && view !== 'login') view = 'login';
+        // Accounts still on their default PIN can't reach any other screen
+        // until they set their own password.
+        if (AppState.isAuthenticated && AppState.forcePasswordChange && view !== 'changepin') view = 'changepin';
 
         const mount = document.getElementById('view-container');
         if (!mount) return;

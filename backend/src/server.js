@@ -27,6 +27,8 @@ app.use('/webhook/library-update', require('./routes/transaction'));
 app.use('/webhook/library-reserve', require('./routes/reserve'));
 app.use('/webhook/library-cancel-reservation', require('./routes/cancelReservation'));
 app.use('/webhook/library-admin-overview', require('./routes/adminOverview'));
+app.use('/webhook/library-extract-pdf', require('./routes/extractBooksFromPdf'));
+app.use('/webhook/library-import-books', require('./routes/importBooks'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

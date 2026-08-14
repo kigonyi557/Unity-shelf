@@ -9,6 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .user-menu-trigger { display: flex; align-items: center; gap: 6px; }
+        .user-menu-icon { font-size: 1.6rem; line-height: 1; }
+        .user-menu-heading { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px 12px; }
+    </style>
 </head>
 <body>
 
@@ -28,14 +33,16 @@
             </a>
             <div id="nav-user-info" class="desktop-nav" style="display: none;">
                 <div class="user-menu" id="user-menu">
-                    <button class="user-menu-trigger" onclick="toggleUserMenu(event)">
-                        <div class="user-meta-block">
-                            <span id="nav-user-name" class="user-profile-name"></span>
-                            <span id="nav-user-badge" class="user-profile-badge"></span>
-                        </div>
+                    <button class="user-menu-trigger" onclick="toggleUserMenu(event)" aria-label="Account menu">
+                        <i class="fas fa-user-circle user-menu-icon"></i>
                         <i class="fas fa-chevron-down user-menu-caret"></i>
                     </button>
                     <div class="user-menu-panel" id="user-menu-panel">
+                        <div class="user-menu-heading">
+                            <span id="nav-user-name" class="user-profile-name"></span>
+                            <span id="nav-user-badge" class="user-profile-badge"></span>
+                        </div>
+                        <div class="user-menu-divider"></div>
                         <button id="nav-admin-link" onclick="closeUserMenu(); router.navigate('admin')" class="user-menu-item" style="display: none;"><i class="fas fa-user-shield"></i> Admin Dashboard</button>
                         <button onclick="closeUserMenu(); openProfileModal()" class="user-menu-item"><i class="fas fa-id-card"></i> My Profile</button>
                         <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> Active Loans</button>

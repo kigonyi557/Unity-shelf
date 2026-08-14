@@ -11,6 +11,8 @@ const CONFIG = {
     N8N_RESERVE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-reserve",
     N8N_CANCEL_RESERVATION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-cancel-reservation",
     N8N_ADMIN_OVERVIEW_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-admin-overview",
+    N8N_EXTRACT_PDF_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-extract-pdf",
+    N8N_IMPORT_BOOKS_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-import-books",
     DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
 };
 
@@ -159,7 +161,7 @@ function authHeaders() {
 window.handleLoginAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
-    const userIdInput = document.getElementById('signin-id').value.trim();
+    const userIdInput = document.getElementById('signin-id').value.trim().toLowerCase();
     const pinInput = document.getElementById('signin-pass').value.trim();
 
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Verifying..."; }
@@ -181,8 +183,6 @@ window.handleLoginAttempt = async function(event) {
             AppState.currentUser = result.user;
             AppState.authToken = result.token || null;
             AppState.offlineMode = false;
-            // Accounts created with a server-issued default PIN must set
-            // their own password before they can use the rest of the app.
             AppState.forcePasswordChange = !!result.mustChangePassword;
             saveStateToStorage();
             configureLayoutVisibility();
@@ -194,9 +194,7 @@ window.handleLoginAttempt = async function(event) {
             }
 
             showToast(`Welcome back, ${result.user.name}`);
-            await fetchRemoteIndexData(); // Sync live sheets library records
-            // Library Assistants land on the admin overview instead of
-            // the resident-facing catalog — different job, different home screen.
+            await fetchRemoteIndexData();
             router.navigate(result.user.accountType === 'Library Assistant' ? 'admin' : 'catalog');
             return;
         }
@@ -253,10 +251,9 @@ window.toggleRegistrationFields = function(accountType) {
 
 // Handles form submission when creating a new user profile. Staff register
 // with a work email (must match the company domain); residents register
-// with a Unit Number and phone number (their login ID). Nobody sets a
-// password here — the server generates a default PIN and returns it in
-// the response; the account is forced to set its own password on first
-// login instead.
+// with a Unit Number, phone number (their login ID), and a separate email
+// address (used only to deliver the verification code). Everyone sets
+// their own password here rather than starting on a shared default.
 window.handleRegistrationAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -323,6 +320,9 @@ window.handleRegistrationAttempt = async function(event) {
     }
 };
 
+// Handles the verification-code form (shown right after registration, or
+// when a login attempt comes back unverified). Confirms the code the
+// person received by email/SMS and unlocks their account for login.
 // Handles the "Change Password" form — requires the correct current
 // password before a new one is accepted. Requires network; there is no
 // offline path for changing a credential, since the offline cache would
@@ -369,8 +369,6 @@ window.handleChangePinAttempt = async function(event) {
             saveStateToStorage();
             showToast("✅ Password updated successfully.");
             if (wasForced) {
-                // First-login flow: send them into the app proper now that
-                // they've set their own password, instead of a generic dashboard.
                 await fetchRemoteIndexData();
                 router.navigate(AppState.currentUser.accountType === 'Library Assistant' ? 'admin' : 'catalog');
             } else {
@@ -752,8 +750,6 @@ window.goToHeroSlide = function(index) {
 const router = {
     navigate: async (view) => {
         if (!AppState.isAuthenticated && view !== 'login') view = 'login';
-        // Accounts still on their default PIN can't reach any other screen
-        // until they set their own password.
         if (AppState.isAuthenticated && AppState.forcePasswordChange && view !== 'changepin') view = 'changepin';
 
         const mount = document.getElementById('view-container');
@@ -781,7 +777,6 @@ const router = {
             }
             if (view === 'catalog') {
                 injectShimmerState('catalog-list', 3);
-                compileStatsStrip();
                 compileTrendingBlock();
                 setTimeout(() => compileCatalogDisplayBlock(), 200);
             }
@@ -793,6 +788,7 @@ const router = {
             }
             if (view === 'admin') {
                 compileAdminDisplayBlock();
+                compileStatsStrip();
             }
         } catch (renderError) {
             console.error(`Unity Reads: render error while navigating to "${view}"`, renderError);
@@ -1366,6 +1362,150 @@ async function compileAdminDisplayBlock() {
         showToast("❌ Could not reach the server for the admin overview.");
     }
 }
+
+// Holds the assistant's reviewed-but-not-yet-saved book list between the
+// "extract" and "confirm" steps. Nothing here touches the database until
+// handleConfirmImportBooks() is called.
+let pendingBookImports = [];
+
+// Uploads a PDF (invoice, packing slip, plain list — any format) and asks
+// the server to pull out a structured book list for review. No catalog
+// changes happen at this step.
+window.handlePdfExtraction = async function(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('import-pdf-file');
+    const submitBtn = document.getElementById('import-extract-btn');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Reading PDF...';
+
+    try {
+        const formData = new FormData();
+        formData.append('pdf', file);
+
+        // No Content-Type header here — the browser sets the multipart
+        // boundary itself when the body is a FormData object.
+        const response = await fetch(CONFIG.N8N_EXTRACT_PDF_WEBHOOK, {
+            method: 'POST',
+            headers: { ...authHeaders() },
+            body: formData,
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            showToast(`❌ ${result.message || 'Could not extract books from that PDF.'}`);
+            return;
+        }
+
+        pendingBookImports = result.books.map(b => ({
+            title: b.title || '',
+            author: b.author || '',
+            referenceNo: b.referenceNo || '',
+            ageBracket: b.ageBracket === 'Kids' ? 'Kids' : 'Adults',
+            grade: b.grade || '',
+            copies: 1,
+        }));
+
+        renderBookPreviewTable();
+        document.getElementById('import-preview-wrap').style.display = 'block';
+        showToast(`📚 Found ${pendingBookImports.length} book(s) — review below before confirming.`);
+    } catch (error) {
+        showToast("❌ Network unavailable — could not upload the PDF.");
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Extract Books from PDF';
+    }
+};
+
+function escapeAttr(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+// Renders the editable preview table from pendingBookImports. Every field
+// is a live input tied back to updatePendingBook(), so the assistant can
+// fix typos or missing data before anything is saved.
+function renderBookPreviewTable() {
+    const node = document.getElementById('import-preview-table');
+    if (!node) return;
+
+    if (pendingBookImports.length === 0) {
+        node.innerHTML = `<p class="catalog-subsection-empty">No books left to add.</p>`;
+        return;
+    }
+
+    node.innerHTML = `<table class="admin-table">
+        <thead><tr><th>Title</th><th>Author</th><th>Ref No.</th><th>Category</th><th>Grade</th><th>Copies</th><th></th></tr></thead>
+        <tbody>${pendingBookImports.map((b, i) => `
+            <tr>
+                <td><input type="text" class="form-input" value="${escapeAttr(b.title)}" oninput="updatePendingBook(${i}, 'title', this.value)"></td>
+                <td><input type="text" class="form-input" value="${escapeAttr(b.author)}" oninput="updatePendingBook(${i}, 'author', this.value)"></td>
+                <td><input type="text" class="form-input" value="${escapeAttr(b.referenceNo)}" oninput="updatePendingBook(${i}, 'referenceNo', this.value)"></td>
+                <td>
+                    <select class="form-input" onchange="updatePendingBook(${i}, 'ageBracket', this.value)">
+                        <option value="Kids" ${b.ageBracket === 'Kids' ? 'selected' : ''}>Kids</option>
+                        <option value="Adults" ${b.ageBracket === 'Adults' ? 'selected' : ''}>Adults</option>
+                    </select>
+                </td>
+                <td><input type="text" class="form-input" value="${escapeAttr(b.grade)}" oninput="updatePendingBook(${i}, 'grade', this.value)"></td>
+                <td><input type="number" min="1" class="form-input" style="width:70px" value="${b.copies}" oninput="updatePendingBook(${i}, 'copies', this.value)"></td>
+                <td><button type="button" onclick="removePendingBook(${i})" class="btn btn-uh-secondary">Remove</button></td>
+            </tr>
+        `).join('')}</tbody>
+    </table>`;
+}
+
+window.updatePendingBook = function(index, field, value) {
+    if (!pendingBookImports[index]) return;
+    pendingBookImports[index][field] = value;
+};
+
+window.removePendingBook = function(index) {
+    pendingBookImports.splice(index, 1);
+    renderBookPreviewTable();
+};
+
+// The actual save step — only reachable after a human has reviewed the
+// list above. Sends the final, edited list to the server to be written
+// into the catalog with newly generated title/copy IDs.
+window.handleConfirmImportBooks = async function() {
+    const branch = document.getElementById('import-branch-select').value;
+    const confirmBtn = document.getElementById('import-confirm-btn');
+
+    if (pendingBookImports.length === 0) {
+        showToast('❌ No books to add.');
+        return;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Saving...';
+
+    try {
+        const response = await fetch(CONFIG.N8N_IMPORT_BOOKS_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ branch, books: pendingBookImports }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            showToast(`❌ ${result.message || 'Could not save books.'}`);
+            return;
+        }
+
+        showToast(`✅ ${result.message}`);
+        pendingBookImports = [];
+        document.getElementById('import-preview-wrap').style.display = 'none';
+        document.getElementById('import-pdf-file').value = '';
+        await fetchRemoteIndexData();
+    } catch (error) {
+        showToast("❌ Network unavailable — could not save the books.");
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm & Add to Catalog';
+    }
+};
 
 // =========================================================================
 // 8. NOTIFICATION POPUP ALERTS

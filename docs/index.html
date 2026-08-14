@@ -253,8 +253,6 @@
                 <span class="section-meta">LIVE CATALOGUE</span>
                 <h2 class="section-title">Browse Available Books</h2>
 
-                <div id="catalog-stats-strip" class="stats-strip mt-6"></div>
-
                 <div class="search-bar-frame mt-6">
                     <div class="search-input-frame">
                         <i class="fas fa-magnifying-glass search-frame-icon"></i>
@@ -373,6 +371,7 @@
             </div>
 
             <div id="admin-stats-strip" class="stats-strip mt-6"></div>
+            <div id="catalog-stats-strip" class="stats-strip mt-4"></div>
 
             <div class="admin-panel mt-12">
                 <h3 class="trending-heading"><i class="fas fa-book-open"></i> All Active Loans</h3>
@@ -382,6 +381,35 @@
             <div class="admin-panel mt-12">
                 <h3 class="trending-heading"><i class="fas fa-bookmark"></i> Active Reservations</h3>
                 <div id="admin-reservations-table" class="admin-table-wrap"></div>
+            </div>
+
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-file-pdf"></i> Add New Books</h3>
+                <p class="text-secondary mb-4">Upload a PDF (invoice, packing slip, or list) — the system will pull out book details for you to review before anything is added to the catalog.</p>
+
+                <form onsubmit="handlePdfExtraction(event)" class="contact-form-matrix">
+                    <div class="form-group">
+                        <label class="form-label" for="import-pdf-file">PDF File</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-file-pdf input-icon"></i>
+                            <input type="file" id="import-pdf-file" class="form-input" accept="application/pdf" required>
+                        </div>
+                    </div>
+                    <button type="submit" id="import-extract-btn" class="btn btn-uh-primary mt-2">Extract Books from PDF</button>
+                </form>
+
+                <div id="import-preview-wrap" class="mt-8" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label" for="import-branch-select">Add copies to branch</label>
+                        <select id="import-branch-select" class="form-input">
+                            <option value="Unity West">Unity West</option>
+                            <option value="Unity East">Unity East</option>
+                            <option value="Unity Gardens">Unity Gardens</option>
+                        </select>
+                    </div>
+                    <div id="import-preview-table" class="admin-table-wrap"></div>
+                    <button type="button" onclick="handleConfirmImportBooks()" id="import-confirm-btn" class="btn btn-uh-primary mt-4">Confirm &amp; Add to Catalog</button>
+                </div>
             </div>
 
             <div class="navigation-hub-tray mt-12">

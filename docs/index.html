@@ -3,17 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unity Shelf — Unity Homes Library Portal</title>
+    <title>Knowledge Hub — Unity Homes Library Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .user-menu-trigger { display: flex; align-items: center; gap: 6px; }
-        .user-menu-icon { font-size: 1.6rem; line-height: 1; }
-        .user-menu-heading { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px 12px; }
-    </style>
 </head>
 <body>
 
@@ -29,28 +24,28 @@
     <header class="global-header">
         <div class="header-container">
             <a href="#" class="brand-logo" onclick="event.preventDefault(); router.navigate('catalog')">
-                <img src="assets/unity-shelf-mark.png" class="brand-logo-mark" alt="Our Community Foundation">
+                
+                <span class="logo-bold"><img src="knowledge_hub.png" class="brand-logo-mark" alt="Knowledge Hub" onerror="this.style.display='none';"></span><span class="logo-light">Hub</span>
             </a>
             <div id="nav-user-info" class="desktop-nav" style="display: none;">
                 <div class="user-menu" id="user-menu">
                     <button class="user-menu-trigger" onclick="toggleUserMenu(event)" aria-label="Account menu">
-                        <i class="fas fa-user-circle user-menu-icon"></i>
+                        <i class="fas fa-circle-user user-menu-avatar-icon"></i>
                         <i class="fas fa-chevron-down user-menu-caret"></i>
                     </button>
                     <div class="user-menu-panel" id="user-menu-panel">
-                        <div class="user-menu-heading">
-                            <span id="nav-user-name" class="user-profile-name"></span>
-                            <span id="nav-user-badge" class="user-profile-badge"></span>
+                        <div class="user-menu-account-header">
+                            <i class="fas fa-circle-user user-menu-account-icon"></i>
+                            <div class="user-meta-block">
+                                <span id="nav-user-name" class="user-profile-name"></span>
+                                <span id="nav-user-badge" class="user-profile-badge"></span>
+                            </div>
                         </div>
                         <div class="user-menu-divider"></div>
                         <button id="nav-admin-link" onclick="closeUserMenu(); router.navigate('admin')" class="user-menu-item" style="display: none;"><i class="fas fa-user-shield"></i> Admin Dashboard</button>
-                        <button onclick="closeUserMenu(); openProfileModal()" class="user-menu-item"><i class="fas fa-id-card"></i> My Profile</button>
-                        <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> Active Loans</button>
-                        <button onclick="closeUserMenu(); openMessagesModal()" class="user-menu-item"><i class="fas fa-bell"></i> Messages<span id="messages-badge" class="menu-badge" style="display:none;"></span></button>
-                        <button onclick="closeUserMenu(); openHotReadsModal()" class="user-menu-item"><i class="fas fa-fire"></i> Hot Reads</button>
-                        <div class="user-menu-divider"></div>
                         <button onclick="closeUserMenu(); router.navigate('catalog')" class="user-menu-item"><i class="fas fa-book-open"></i> Browse Catalog</button>
-                        <button onclick="closeUserMenu(); router.navigate('changepin')" class="user-menu-item"><i class="fas fa-key"></i> Change Password</button>
+                        <button onclick="closeUserMenu(); router.navigate('dashboard')" class="user-menu-item"><i class="fas fa-folder-open"></i> My Loans</button>
+                        <button onclick="closeUserMenu(); router.navigate('changepin')" class="user-menu-item"><i class="fas fa-key"></i> Change PIN</button>
                         <div class="user-menu-divider"></div>
                         <button onclick="closeUserMenu(); handleLogout()" class="user-menu-item user-menu-item-danger"><i class="fas fa-sign-out-alt"></i> Log Out</button>
                     </div>
@@ -70,7 +65,7 @@
                 <div class="hero-copy">
                     <span class="tagline-badge">A Unity Homes Community Amenity</span>
                     <h1 class="hero-title">A shared shelf for every Unity Homes estate.</h1>
-                    <p class="hero-subtitle">Borrow a book, pass it on, and meet your neighbours in between. The Unity Shelf runs on the same trust that built our estates — everything below is what's currently on it.</p>
+                    <p class="hero-subtitle">Borrow a book, pass it on, and meet your neighbours in between. The Knowledge Hub runs on the same trust that built our estates — everything below is what's currently on it.</p>
                 </div>
 
                 <div class="auth-card auth-toggle-card hero-auth-card">
@@ -96,10 +91,10 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label" for="signin-pass">Password</label>
+                                    <label class="form-label" for="signin-pass">Security PIN</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-key input-icon"></i>
-                                        <input type="password" id="signin-pass" class="form-input" placeholder="Enter your password" required>
+                                        <input type="password" id="signin-pass" class="form-input" placeholder="••••" required>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-uh-primary mt-2">Log In</button>
@@ -114,7 +109,7 @@
                                 <p class="auth-subtitle">Register as a resident or staff member</p>
                             </div>
                             <form onsubmit="handleRegistrationAttempt(event)" class="contact-form-matrix">
-                                <div class="form-group">
+                                <div class="form-group" id="estate-group">
                                     <label class="form-label" for="signup-estate">Estate</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-map-pin input-icon"></i>
@@ -149,14 +144,6 @@
                                     </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="checkbox-label" for="signup-is-adult">
-                                        <input type="checkbox" id="signup-is-adult">
-                                        I confirm I am 18 years of age or older
-                                    </label>
-                                    <p class="field-hint">Leave unchecked if under 18 — adult-category titles will be hidden from your catalog view.</p>
-                                </div>
-
                                 <div class="form-group" id="staff-email-group" style="display: none;">
                                     <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag">[@unityhomes.co.ke]</span></label>
                                     <div class="input-wrapper">
@@ -179,14 +166,6 @@
                                         <input type="tel" id="signup-phone" class="form-input" placeholder="e.g. 07XXXXXXXX">
                                     </div>
                                 </div>
-                                <div class="form-group" id="resident-email-group" style="display: none;">
-                                    <label class="form-label" for="signup-email">Email Address <span class="pk-tag">(optional)</span></label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-envelope input-icon"></i>
-                                        <input type="email" id="signup-email" class="form-input" placeholder="you@example.com">
-                                    </div>
-                                    <p class="field-hint">Used for account recovery only — not required to register.</p>
-                                </div>
 
                                 <button type="submit" class="btn btn-uh-secondary mt-2">Register Account</button>
                                 <p class="auth-switch-hint">Already have an account? <a href="#" onclick="event.preventDefault(); switchAuthTab('login')">Log in</a></p>
@@ -195,28 +174,22 @@
 
                         <div class="auth-panel" id="panel-verify">
                             <div class="card-header">
-                                <div class="icon-badge icon-badge-3"><i class="fas fa-circle-check"></i></div>
-                                <h3 class="auth-title">Account Created</h3>
-                                <p class="auth-subtitle">Here is your default login PIN</p>
+                                <div class="icon-badge icon-badge-3"><i class="fas fa-shield-halved"></i></div>
+                                <h3 class="auth-title">Verify Your Account</h3>
+                                <p class="auth-subtitle" id="verify-subtitle">Enter the code we sent you</p>
                             </div>
-                            <div class="contact-form-matrix">
+                            <form onsubmit="handleVerifyAccount(event)" class="contact-form-matrix">
+                                <input type="hidden" id="verify-userid">
                                 <div class="form-group">
-                                    <label class="form-label" for="verify-userid-display">Your Login ID</label>
+                                    <label class="form-label" for="verify-code">Verification Code</label>
                                     <div class="input-wrapper">
-                                        <i class="fas fa-address-book input-icon"></i>
-                                        <input type="text" id="verify-userid-display" class="form-input" readonly>
+                                        <i class="fas fa-hashtag input-icon"></i>
+                                        <input type="text" id="verify-code" class="form-input" placeholder="6-digit code" required>
                                     </div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="verify-pin-display">Default PIN</label>
-                                    <div class="input-wrapper">
-                                        <i class="fas fa-key input-icon"></i>
-                                        <input type="text" id="verify-pin-display" class="form-input" readonly>
-                                    </div>
-                                    <p class="field-hint">Write this down now — you'll be asked to set your own password the first time you log in.</p>
-                                </div>
-                                <button type="button" class="btn btn-uh-primary mt-2" onclick="switchAuthTab('login')">Continue to Log In</button>
-                            </div>
+                                <button type="submit" class="btn btn-uh-primary mt-2">Verify</button>
+                                <p class="auth-switch-hint">Wrong details? <a href="#" onclick="event.preventDefault(); switchAuthTab('register')">Start over</a></p>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -260,6 +233,8 @@
                 <span class="section-meta">LIVE CATALOGUE</span>
                 <h2 class="section-title">Browse Available Books</h2>
 
+                <div id="catalog-stats-strip" class="stats-strip mt-6"></div>
+
                 <div class="search-bar-frame mt-6">
                     <div class="search-input-frame">
                         <i class="fas fa-magnifying-glass search-frame-icon"></i>
@@ -273,8 +248,12 @@
                     <button id="filter-pill-AVAILABLE" onclick="handleCatalogFilter('AVAILABLE')" class="filter-pill-btn">Available</button>
                     <button id="filter-pill-ON_LOAN" onclick="handleCatalogFilter('ON_LOAN')" class="filter-pill-btn">Borrowed</button>
                 </div>
+                <div class="filter-actions-cluster mt-2">
+                    <span class="catalog-shortcut-label">Jump to:</span>
+                    <button onclick="jumpToCatalogSection('adults')" class="filter-pill-shortcut"><i class="fas fa-user"></i> Adults' Books</button>
+                    <button onclick="jumpToCatalogSection('children')" class="filter-pill-shortcut"><i class="fas fa-child"></i> Children's Books</button>
+                </div>
                 <p id="catalog-count-label" class="text-xs text-secondary mt-2"></p>
-                <p id="minor-restriction-note" class="field-hint" style="display:none;"><i class="fas fa-shield-halved"></i> Some titles are hidden because this account is registered as under 18.</p>
             </div>
 
             <div class="trending-section mt-6">
@@ -286,7 +265,7 @@
                 </div>
 
             <div class="navigation-hub-tray mt-12">
-                <button onclick="router.navigate('dashboard')" class="btn btn-uh-secondary font-bold"><i class="fas fa-folder-open"></i> View My Borrowed Books</button>
+                <button onclick="router.navigate('dashboard')" class="btn btn-uh-secondary"><i class="fas fa-folder-open"></i> View My Borrowed Books</button>
             </div>
         </section>
     </template>
@@ -331,35 +310,35 @@
         <section class="section-padding container">
             <div class="section-header text-center">
                 <span class="section-meta">ACCOUNT SECURITY</span>
-                <h2 class="section-title">Change Your Password</h2>
-                <p class="hero-subtitle" style="margin-top: 0.5rem;">Update your password any time — you'll need your current one first.</p>
+                <h2 class="section-title">Change Your Security PIN</h2>
+                <p class="hero-subtitle" style="margin: 0.5rem auto 0 auto; text-align: center;">Every new account starts on the shared default PIN. Set your own so only you can access your account.</p>
             </div>
 
             <div class="auth-grid mt-6" style="max-width: 500px;">
                 <div class="auth-card">
                     <form onsubmit="handleChangePinAttempt(event)" class="contact-form-matrix">
                         <div class="form-group">
-                            <label class="form-label" for="changepin-current">Current Password</label>
+                            <label class="form-label" for="changepin-current">Current PIN</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-key input-icon"></i>
-                                <input type="password" id="changepin-current" class="form-input" placeholder="Current password" required>
+                                <input type="password" id="changepin-current" class="form-input" placeholder="Current PIN" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="changepin-new">New Password</label>
+                            <label class="form-label" for="changepin-new">New PIN</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-lock input-icon"></i>
-                                <input type="password" id="changepin-new" class="form-input" placeholder="New password (min. 6 characters)" required>
+                                <input type="password" id="changepin-new" class="form-input" placeholder="New PIN (min. 4 characters)" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="changepin-confirm">Confirm New Password</label>
+                            <label class="form-label" for="changepin-confirm">Confirm New PIN</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-lock input-icon"></i>
-                                <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new password" required>
+                                <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new PIN" required>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-uh-primary mt-2">Update Password</button>
+                        <button type="submit" class="btn btn-uh-primary mt-2">Update PIN</button>
                     </form>
                 </div>
             </div>
@@ -378,7 +357,6 @@
             </div>
 
             <div id="admin-stats-strip" class="stats-strip mt-6"></div>
-            <div id="catalog-stats-strip" class="stats-strip mt-4"></div>
 
             <div class="admin-panel mt-12">
                 <h3 class="trending-heading"><i class="fas fa-book-open"></i> All Active Loans</h3>
@@ -388,35 +366,6 @@
             <div class="admin-panel mt-12">
                 <h3 class="trending-heading"><i class="fas fa-bookmark"></i> Active Reservations</h3>
                 <div id="admin-reservations-table" class="admin-table-wrap"></div>
-            </div>
-
-            <div class="admin-panel mt-12">
-                <h3 class="trending-heading"><i class="fas fa-file-pdf"></i> Add New Books</h3>
-                <p class="text-secondary mb-4">Upload a PDF (invoice, packing slip, or list) — the system will pull out book details for you to review before anything is added to the catalog.</p>
-
-                <form onsubmit="handlePdfExtraction(event)" class="contact-form-matrix">
-                    <div class="form-group">
-                        <label class="form-label" for="import-pdf-file">PDF File</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-file-pdf input-icon"></i>
-                            <input type="file" id="import-pdf-file" class="form-input" accept="application/pdf" required>
-                        </div>
-                    </div>
-                    <button type="submit" id="import-extract-btn" class="btn btn-uh-primary mt-2">Extract Books from PDF</button>
-                </form>
-
-                <div id="import-preview-wrap" class="mt-8" style="display: none;">
-                    <div class="form-group">
-                        <label class="form-label" for="import-branch-select">Add copies to branch</label>
-                        <select id="import-branch-select" class="form-input">
-                            <option value="Unity West">Unity West</option>
-                            <option value="Unity East">Unity East</option>
-                            <option value="Unity Gardens">Unity Gardens</option>
-                        </select>
-                    </div>
-                    <div id="import-preview-table" class="admin-table-wrap"></div>
-                    <button type="button" onclick="handleConfirmImportBooks()" id="import-confirm-btn" class="btn btn-uh-primary mt-4">Confirm &amp; Add to Catalog</button>
-                </div>
             </div>
 
             <div class="navigation-hub-tray mt-12">
@@ -435,19 +384,9 @@
 
     <footer class="global-footer">
         <div class="container text-center">
-            <p>&copy; 2026 Unity Shelf — a Unity Homes Library System. All transaction records safely secured.</p>
+            <p>&copy; 2026 Knowledge Hub — a Unity Homes Library System. All transaction records safely secured.</p>
         </div>
     </footer>
-
-    <div class="uh-modal-overlay" id="uh-modal-overlay" onclick="if(event.target===this) closeActiveModal()" style="display:none;">
-        <div class="uh-modal">
-            <div class="uh-modal-header">
-                <h3 id="uh-modal-title">Modal Title</h3>
-                <button class="uh-modal-close" onclick="closeActiveModal()" aria-label="Close"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="uh-modal-body" id="uh-modal-body"></div>
-        </div>
-    </div>
 
     <script src="app.js"></script>
 </body>

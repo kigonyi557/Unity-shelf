@@ -13,6 +13,7 @@ const CONFIG = {
     N8N_ADMIN_OVERVIEW_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-admin-overview",
     N8N_EXTRACT_PDF_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-extract-pdf",
     N8N_IMPORT_BOOKS_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-import-books",
+    N8N_UPDATE_PROFILE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-update-profile",
     DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
 };
 
@@ -225,8 +226,13 @@ window.handleLoginAttempt = async function(event) {
 // Account Type — Staff needs a work email, Residents need a Unit Number
 // and phone. Only the visible set is marked `required` so the browser
 // doesn't block submission on hidden fields.
-window.toggleRegistrationFields = function(accountType) {
+// The estate select now doubles as the account-type picker: choosing an
+// actual estate means Resident; choosing "STAFF" reveals the work-email
+// field plus a checkbox to additionally mark the account as a Library
+// Assistant. This replaces the old separate "Account Type" dropdown.
+window.toggleRegistrationFields = function(estateValue) {
     const staffGroup = document.getElementById('staff-email-group');
+    const libraryAssistantGroup = document.getElementById('library-assistant-group');
     const unitGroup = document.getElementById('resident-unit-group');
     const phoneGroup = document.getElementById('resident-phone-group');
     const emailGroup = document.getElementById('resident-email-group');
@@ -234,35 +240,44 @@ window.toggleRegistrationFields = function(accountType) {
     const unitInput = document.getElementById('signup-unit');
     const phoneInput = document.getElementById('signup-phone');
     const emailInput = document.getElementById('signup-email');
+    const laCheckbox = document.getElementById('signup-is-library-assistant');
 
-    const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
-    const isResident = accountType === 'Resident';
+    const isStaff = estateValue === 'STAFF';
+    const isResident = !!estateValue && !isStaff;
 
-    if (staffGroup) staffGroup.style.display = isStaffLike ? 'flex' : 'none';
+    if (staffGroup) staffGroup.style.display = isStaff ? 'flex' : 'none';
+    if (libraryAssistantGroup) libraryAssistantGroup.style.display = isStaff ? 'flex' : 'none';
     if (unitGroup) unitGroup.style.display = isResident ? 'flex' : 'none';
     if (phoneGroup) phoneGroup.style.display = isResident ? 'flex' : 'none';
     if (emailGroup) emailGroup.style.display = isResident ? 'flex' : 'none';
 
-    if (workEmailInput) workEmailInput.required = isStaffLike;
+    if (workEmailInput) workEmailInput.required = isStaff;
     if (unitInput) unitInput.required = isResident;
     if (phoneInput) phoneInput.required = isResident;
     if (emailInput) emailInput.required = isResident;
+
+    if (!isStaff && laCheckbox) laCheckbox.checked = false;
 };
 
-// Handles form submission when creating a new user profile. Staff register
-// with a work email (must match the company domain); residents register
-// with a Unit Number, phone number (their login ID), and a separate email
-// address (used only to deliver the verification code). Everyone sets
-// their own password here rather than starting on a shared default.
+// Handles form submission when creating a new user profile. The estate
+// select doubles as the account-type choice (an actual estate = Resident,
+// "STAFF" = staff-like), with a checkbox distinguishing plain Staff from
+// Library Assistant. Everyone gets a server-generated default PIN rather
+// than choosing their own password here.
 window.handleRegistrationAttempt = async function(event) {
     event.preventDefault();
     const submitBtn = event.target.querySelector('button[type="submit"]');
-    const estateInput = document.getElementById('signup-estate').value;
-    const accountTypeInput = document.getElementById('signup-affiliation').value;
+    const estateSelectValue = document.getElementById('signup-estate').value;
+    const isLibraryAssistantChecked = document.getElementById('signup-is-library-assistant').checked;
     const nameInput = document.getElementById('signup-name').value.trim();
     const isAdultInput = document.getElementById('signup-is-adult').checked;
 
-    const isStaffLike = accountTypeInput === 'Staff' || accountTypeInput === 'Library Assistant';
+    const isStaffLike = estateSelectValue === 'STAFF';
+    const accountTypeInput = isStaffLike
+        ? (isLibraryAssistantChecked ? 'Library Assistant' : 'Staff')
+        : 'Resident';
+    const estateInput = isStaffLike ? '' : estateSelectValue;
+
     let userIdInput = '';
     let workEmailInput = '';
     let unitInput = '';
@@ -457,9 +472,107 @@ window.openProfileModal = function() {
         <div class="uh-profile-row"><span>Account Type</span><span>${user.accountType}</span></div>
         ${user.estateBranch ? `<div class="uh-profile-row"><span>Estate</span><span>${user.estateBranch}</span></div>` : ''}
         <div class="uh-profile-row"><span>Login ID</span><span>${user.userId}</span></div>
+        <button type="button" class="btn btn-uh-secondary mt-4" onclick="openEditProfileModal()"><i class="fas fa-pen"></i> Edit Profile</button>
         <h4 style="margin: 1.25rem 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: var(--text-dark);">Currently Borrowed (${myLoans.length})</h4>
         ${borrowedListHtml}
     `);
+};
+
+// Lets the signed-in user update their own name and (for residents) their
+// estate, unit number, and recovery email. Login ID and account type stay
+// fixed — see updateProfile.js on the backend for why.
+window.openEditProfileModal = function() {
+    const user = AppState.currentUser;
+    if (!user) return;
+
+    const isResident = user.accountType === 'Resident';
+    const estateOptions = ['Unity One', 'Unity West', 'Unity East', 'Unity Gardens', 'Unity Silver Hill', 'Unity Parkside']
+        .map(e => `<option value="${e}" ${user.estateBranch === e ? 'selected' : ''}>${e}</option>`).join('');
+
+    openModal('Edit Profile', `
+        <form onsubmit="handleUpdateProfile(event)" class="contact-form-matrix">
+            <div class="form-group">
+                <label class="form-label" for="edit-profile-name">Full Name</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-user input-icon"></i>
+                    <input type="text" id="edit-profile-name" class="form-input" value="${user.name || ''}" required>
+                </div>
+            </div>
+            ${isResident ? `
+            <div class="form-group">
+                <label class="form-label" for="edit-profile-estate">Estate</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-map-pin input-icon"></i>
+                    <select id="edit-profile-estate" class="form-input form-select">${estateOptions}</select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-profile-unit">Unit Number</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-door-open input-icon"></i>
+                    <input type="text" id="edit-profile-unit" class="form-input" value="${user.unitNumber || ''}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-profile-email">Email Address <span class="pk-tag">(optional)</span></label>
+                <div class="input-wrapper">
+                    <i class="fas fa-envelope input-icon"></i>
+                    <input type="email" id="edit-profile-email" class="form-input" value="${user.email || ''}">
+                </div>
+            </div>` : ''}
+            <p class="field-hint">Your login ID (${user.userId}) and account type can't be changed here.</p>
+            <button type="submit" class="btn btn-uh-primary mt-2">Save Changes</button>
+        </form>
+    `);
+};
+
+// Submits the edit-profile form and refreshes AppState.currentUser with
+// whatever the server actually saved, so the header/menu and any other
+// screen reading AppState.currentUser stay in sync immediately.
+window.handleUpdateProfile = async function(event) {
+    event.preventDefault();
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const user = AppState.currentUser;
+    if (!user) return;
+
+    const name = document.getElementById('edit-profile-name').value.trim();
+    const isResident = user.accountType === 'Resident';
+    const estateBranch = isResident ? document.getElementById('edit-profile-estate').value : user.estateBranch;
+    const unitNumber = isResident ? document.getElementById('edit-profile-unit').value.trim() : null;
+    const email = isResident ? document.getElementById('edit-profile-email').value.trim() : null;
+
+    if (!name) {
+        showToast('❌ Name cannot be empty.');
+        return;
+    }
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
+
+    try {
+        const response = await fetch(CONFIG.N8N_UPDATE_PROFILE_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ userId: user.userId, name, estateBranch, unitNumber, email }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            showToast(`❌ ${result.message || 'Could not update profile.'}`);
+            return;
+        }
+
+        AppState.currentUser = { ...AppState.currentUser, ...result.user };
+        saveStateToStorage();
+        const navName = document.getElementById('nav-user-name');
+        if (navName) navName.textContent = AppState.currentUser.name;
+        showToast('✅ Profile updated.');
+        window.closeActiveModal();
+        openProfileModal();
+    } catch (error) {
+        showToast('❌ Network unavailable — could not save changes.');
+    } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save Changes'; }
+    }
 };
 
 // Shared by openMessagesModal() and refreshMessagesBadge() so the count

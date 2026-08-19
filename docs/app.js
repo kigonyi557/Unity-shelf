@@ -14,6 +14,8 @@ const CONFIG = {
     N8N_EXTRACT_PDF_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-extract-pdf",
     N8N_IMPORT_BOOKS_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-import-books",
     N8N_UPDATE_PROFILE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-update-profile",
+    N8N_ALL_USERS_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-all-users",
+    N8N_USER_DETAIL_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-user-detail",
     DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
 };
 
@@ -902,6 +904,7 @@ const router = {
             if (view === 'admin') {
                 compileAdminDisplayBlock();
                 compileStatsStrip();
+                compileUsersDirectory();
             }
         } catch (renderError) {
             console.error(`Unity Reads: render error while navigating to "${view}"`, renderError);
@@ -1479,6 +1482,115 @@ async function compileAdminDisplayBlock() {
 // Holds the assistant's reviewed-but-not-yet-saved book list between the
 // "extract" and "confirm" steps. Nothing here touches the database until
 // handleConfirmImportBooks() is called.
+// Caches the last-fetched user list client-side so the search box can
+// filter instantly without re-hitting the server on every keystroke.
+let usersDirectoryCache = [];
+
+async function compileUsersDirectory() {
+    const node = document.getElementById('users-directory-table');
+    if (!node) return;
+    node.innerHTML = `<p class="catalog-subsection-empty">Loading users...</p>`;
+
+    try {
+        const response = await fetch(CONFIG.N8N_ALL_USERS_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            node.innerHTML = `<p class="catalog-subsection-empty">Could not load users.</p>`;
+            return;
+        }
+
+        usersDirectoryCache = result.users;
+        renderUsersDirectoryTable(usersDirectoryCache);
+    } catch (error) {
+        node.innerHTML = `<p class="catalog-subsection-empty">Network unavailable.</p>`;
+    }
+}
+
+function renderUsersDirectoryTable(users) {
+    const node = document.getElementById('users-directory-table');
+    if (!node) return;
+
+    if (users.length === 0) {
+        node.innerHTML = `<p class="catalog-subsection-empty">No users found.</p>`;
+        return;
+    }
+
+    node.innerHTML = `<table class="admin-table">
+        <thead><tr><th>Name</th><th>Login ID</th><th>Type</th><th>Estate</th><th>Verified</th><th>Active Loans</th><th></th></tr></thead>
+        <tbody>${users.map(u => `
+            <tr>
+                <td>${u.name}</td>
+                <td>${u.userId}</td>
+                <td>${u.accountType}</td>
+                <td>${u.estateBranch || '—'}</td>
+                <td>${u.verified ? '<i class="fas fa-circle-check" style="color: #2e7d32;"></i>' : '<i class="fas fa-clock" style="color: #b26a00;"></i>'}</td>
+                <td>${u.activeLoans}</td>
+                <td><button type="button" class="btn btn-uh-secondary" onclick="viewUserDetail('${u.userId}')">View</button></td>
+            </tr>
+        `).join('')}</tbody>
+    </table>`;
+}
+
+window.filterUsersDirectory = function() {
+    const query = document.getElementById('users-directory-search').value.trim().toLowerCase();
+    if (!query) { renderUsersDirectoryTable(usersDirectoryCache); return; }
+    const filtered = usersDirectoryCache.filter(u =>
+        u.name.toLowerCase().includes(query) || u.userId.toLowerCase().includes(query)
+    );
+    renderUsersDirectoryTable(filtered);
+};
+
+// The drill-down: full account details plus complete loan and reservation
+// history for one user, pulled fresh from the server on click.
+window.viewUserDetail = async function(userId) {
+    openModal('Loading...', `<p class="catalog-subsection-empty">Loading account details...</p>`);
+
+    try {
+        const response = await fetch(CONFIG.N8N_USER_DETAIL_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ userId }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            openModal('Error', `<p class="catalog-subsection-empty">${result.message || 'Could not load account.'}</p>`);
+            return;
+        }
+
+        const u = result.user;
+        const loansHtml = result.loans.length === 0
+            ? `<p class="catalog-subsection-empty">No loan history.</p>`
+            : result.loans.map(l => `<div class="uh-profile-row"><span>${l.bookTitle} (${l.branch})</span><span>${l.status === 'ACTIVE' ? 'Borrowed ' + (l.borrowedAt || '').slice(0, 10) : 'Returned ' + (l.returnDate || '').slice(0, 10)}</span></div>`).join('');
+        const resHtml = result.reservations.length === 0
+            ? `<p class="catalog-subsection-empty">No reservation history.</p>`
+            : result.reservations.map(r => `<div class="uh-profile-row"><span>${r.bookTitle} (${r.branch})</span><span>${r.status}</span></div>`).join('');
+
+        openModal(u.name, `
+            <div class="uh-profile-row"><span>Login ID</span><span>${u.userId}</span></div>
+            <div class="uh-profile-row"><span>Account Type</span><span>${u.accountType}</span></div>
+            ${u.estateBranch ? `<div class="uh-profile-row"><span>Estate</span><span>${u.estateBranch}</span></div>` : ''}
+            ${u.unitNumber ? `<div class="uh-profile-row"><span>Unit</span><span>${u.unitNumber}</span></div>` : ''}
+            ${u.phone ? `<div class="uh-profile-row"><span>Phone</span><span>${u.phone}</span></div>` : ''}
+            ${u.email ? `<div class="uh-profile-row"><span>Email</span><span>${u.email}</span></div>` : ''}
+            <div class="uh-profile-row"><span>Adult</span><span>${u.isAdult ? 'Yes' : 'No'}</span></div>
+            <div class="uh-profile-row"><span>Verified</span><span>${u.verified ? 'Yes' : 'No'}</span></div>
+            <div class="uh-profile-row"><span>On Default PIN</span><span>${u.mustChangePassword ? 'Yes' : 'No'}</span></div>
+            <div class="uh-profile-row"><span>Registered</span><span>${(u.registeredDate || '').slice(0, 10)}</span></div>
+            <h4 style="margin: 1.25rem 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: var(--text-dark);">Loan History (${result.loans.length})</h4>
+            ${loansHtml}
+            <h4 style="margin: 1.25rem 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: var(--text-dark);">Reservation History (${result.reservations.length})</h4>
+            ${resHtml}
+        `);
+    } catch (error) {
+        openModal('Error', `<p class="catalog-subsection-empty">Network unavailable.</p>`);
+    }
+};
+
 let pendingBookImports = [];
 
 // Uploads a PDF (invoice, packing slip, plain list — any format) and asks

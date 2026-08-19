@@ -393,6 +393,17 @@
             </div>
 
             <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-users"></i> All Registered Users</h3>
+                <div class="search-bar-frame mt-4 mb-4">
+                    <div class="search-input-frame">
+                        <i class="fas fa-magnifying-glass search-frame-icon"></i>
+                        <input type="text" id="users-directory-search" class="form-input" placeholder="Search by name or login ID..." oninput="filterUsersDirectory()">
+                    </div>
+                </div>
+                <div id="users-directory-table" class="admin-table-wrap"></div>
+            </div>
+
+            <div class="admin-panel mt-12">
                 <h3 class="trending-heading"><i class="fas fa-file-pdf"></i> Add New Books</h3>
                 <p class="text-secondary mb-4">Upload a PDF (invoice, packing slip, or list) — the system will pull out book details for you to review before anything is added to the catalog.</p>
 

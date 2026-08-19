@@ -30,6 +30,8 @@ app.use('/webhook/library-admin-overview', require('./routes/adminOverview'));
 app.use('/webhook/library-extract-pdf', require('./routes/extractBooksFromPdf'));
 app.use('/webhook/library-import-books', require('./routes/importBooks'));
 app.use('/webhook/library-update-profile', require('./routes/updateProfile'));
+app.use('/webhook/library-all-users', require('./routes/allUsers'));
+app.use('/webhook/library-user-detail', require('./routes/userDetail'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

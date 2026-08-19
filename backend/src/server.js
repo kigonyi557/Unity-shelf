@@ -32,6 +32,8 @@ app.use('/webhook/library-import-books', require('./routes/importBooks'));
 app.use('/webhook/library-update-profile', require('./routes/updateProfile'));
 app.use('/webhook/library-all-users', require('./routes/allUsers'));
 app.use('/webhook/library-user-detail', require('./routes/userDetail'));
+app.use('/webhook/library-book-interaction', require('./routes/bookInteraction'));
+app.use('/webhook/library-book-interaction-get', require('./routes/bookInteractionGet'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

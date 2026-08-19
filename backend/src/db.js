@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
@@ -78,13 +78,30 @@ db.exec(`
     expires_at      TEXT
   );
 
+  -- One row per (user, title): whether they've marked it read, and their
+  -- own 1-5 star rating. Powers both the "Mark as Read" toggle and the
+  -- community average rating shown in the book detail modal.
+  CREATE TABLE IF NOT EXISTS library_book_interactions (
+    user_id     TEXT NOT NULL,
+    title_id    TEXT NOT NULL,
+    is_read     INTEGER NOT NULL DEFAULT 0,
+    rating      INTEGER,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, title_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_copies_title ON library_copies(title_id);
   CREATE INDEX IF NOT EXISTS idx_loans_status ON library_loans(status);
   CREATE INDEX IF NOT EXISTS idx_loans_user ON library_loans(user_id);
   CREATE INDEX IF NOT EXISTS idx_res_title ON library_reservations(title_id, branch);
   CREATE INDEX IF NOT EXISTS idx_res_user ON library_reservations(user_id);
+  CREATE INDEX IF NOT EXISTS idx_interactions_title ON library_book_interactions(title_id);
 `);
 
+// Runtime migration: databases created before date_of_birth existed (e.g.
+// the already-live production DB) won't have this column yet — CREATE
+// TABLE IF NOT EXISTS above only affects brand-new databases. Add it here
+// if missing, so existing accounts and data are preserved.
 const accountColumns = db.prepare(`PRAGMA table_info(library_accounts)`).all();
 if (!accountColumns.some(c => c.name === 'date_of_birth')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN date_of_birth TEXT`);
@@ -92,6 +109,8 @@ if (!accountColumns.some(c => c.name === 'date_of_birth')) {
 if (!accountColumns.some(c => c.name === 'is_adult')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN is_adult INTEGER`);
 }
+// Default-PIN login flow: accounts start with a server-generated PIN and
+// must be forced to set their own password on first successful login.
 if (!accountColumns.some(c => c.name === 'must_change_password')) {
   db.exec(`ALTER TABLE library_accounts ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
 }

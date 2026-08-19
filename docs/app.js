@@ -16,6 +16,8 @@ const CONFIG = {
     N8N_UPDATE_PROFILE_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-update-profile",
     N8N_ALL_USERS_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-all-users",
     N8N_USER_DETAIL_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-user-detail",
+    N8N_BOOK_INTERACTION_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-book-interaction",
+    N8N_BOOK_INTERACTION_GET_WEBHOOK: "https://unity-shelf-production.up.railway.app/webhook/library-book-interaction-get",
     DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
 };
 
@@ -385,6 +387,7 @@ window.handleChangePinAttempt = async function(event) {
             AppState.forcePasswordChange = false;
             saveStateToStorage();
             showToast("✅ Password updated successfully.");
+            window.closeActiveModal();
             if (wasForced) {
                 await fetchRemoteIndexData();
                 router.navigate(AppState.currentUser.accountType === 'Library Assistant' ? 'admin' : 'catalog');
@@ -474,9 +477,44 @@ window.openProfileModal = function() {
         <div class="uh-profile-row"><span>Account Type</span><span>${user.accountType}</span></div>
         ${user.estateBranch ? `<div class="uh-profile-row"><span>Estate</span><span>${user.estateBranch}</span></div>` : ''}
         <div class="uh-profile-row"><span>Login ID</span><span>${user.userId}</span></div>
-        <button type="button" class="btn btn-uh-secondary mt-4" onclick="openEditProfileModal()"><i class="fas fa-pen"></i> Edit Profile</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-uh-secondary mt-4" onclick="openEditProfileModal()"><i class="fas fa-pen"></i> Edit Profile</button>
+            <button type="button" class="btn btn-uh-secondary mt-4" onclick="openChangePasswordModal()"><i class="fas fa-key"></i> Change Password</button>
+        </div>
         <h4 style="margin: 1.25rem 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: var(--text-dark);">Currently Borrowed (${myLoans.length})</h4>
         ${borrowedListHtml}
+    `);
+};
+
+// Merges the change-password flow into the profile modal itself, instead
+// of it being a separate page — same fields, same handleChangePinAttempt
+// handler, just embedded here for the everyday (non-forced) case.
+window.openChangePasswordModal = function() {
+    openModal('Change Password', `
+        <form onsubmit="handleChangePinAttempt(event)" class="contact-form-matrix">
+            <div class="form-group">
+                <label class="form-label" for="changepin-current">Current Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="changepin-current" class="form-input" placeholder="Current password" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="changepin-new">New Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="changepin-new" class="form-input" placeholder="New password (min. 6 characters)" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="changepin-confirm">Confirm New Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock input-icon"></i>
+                    <input type="password" id="changepin-confirm" class="form-input" placeholder="Re-enter new password" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-uh-primary mt-2">Update Password</button>
+        </form>
     `);
 };
 
@@ -930,6 +968,47 @@ function injectShimmerState(targetElementId, placeholderCount) {
 // 7. USER INTERFACE VIEW RENDERING COMPILERS
 // =========================================================================
 
+// Builds an Open Library cover-image URL from a title's ISBN (reference_no),
+// stripping whitespace/dashes first since the source data is inconsistent
+// ("9 780198 477648" etc). Returns null when there's no usable ISBN, so
+// callers can fall back to a placeholder instead of a broken <img>.
+function coverUrlForTitle(t) {
+    const isbn = (t.referenceNo || '').replace(/[^0-9Xx]/g, '');
+    if (isbn.length < 9) return null;
+    return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+}
+
+function bookCoverMarkup(t) {
+    const coverUrl = coverUrlForTitle(t);
+    if (!coverUrl) {
+        return `<div class="book-cover-placeholder"><i class="fas fa-book"></i></div>`;
+    }
+    // onerror swaps in the same placeholder if Open Library has no cover
+    // for this ISBN — cheaper than pre-checking every cover with a HEAD
+    // request for 800+ titles.
+    return `<img src="${coverUrl}" alt="${escapeAttr(t.title)} cover" class="book-cover-img" loading="lazy" onerror="this.outerHTML='<div class=&quot;book-cover-placeholder&quot;><i class=&quot;fas fa-book&quot;></i></div>'">`;
+}
+
+// Lightweight keyword-based genre classifier — this is a heuristic, not a
+// curated taxonomy, since 800+ existing titles were never manually tagged.
+// Good enough to group the shelf into browsable sections; titles that
+// don't match anything land in a sensible catch-all.
+const GENRE_RULES = [
+    { genre: 'Picture & Board Books', test: (t) => /board book|picture book|my first|nursery/i.test(t.title) },
+    { genre: 'Mystery & Thrillers', test: (t) => /mystery|detective|thriller|crime|spy|noir/i.test(t.title) },
+    { genre: 'Fantasy & Adventure', test: (t) => /dragon|wizard|magic|quest|adventure|fantasy|kingdom/i.test(t.title) },
+    { genre: 'Classics', test: (t) => /classic|dickens|austen|shakespeare|treasure island|secret garden/i.test(t.title + ' ' + (t.author || '')) },
+    { genre: 'Educational & Textbooks', test: (t) => !!t.grade || /activities|teacher's guide|mathematics|kiswahili|english aid/i.test(t.title) },
+    { genre: 'Non-Fiction & Reference', test: (t) => /encyclopedia|facts|history|guide to|biography|memoir|science/i.test(t.title) },
+    { genre: 'Series & Chapter Books', test: (t) => /#\d|book \d|series/i.test(t.title) },
+];
+function inferGenre(t) {
+    for (const rule of GENRE_RULES) {
+        if (rule.test(t)) return rule.genre;
+    }
+    return t.ageBracket === 'Kids' ? 'Storybooks' : 'Fiction & General Reading';
+}
+
 // Renders title columns inside catalog view window frame. Filtering by
 // AVAILABLE/ON_LOAN now looks at whether a title has ANY available copy
 // anywhere, since availability is a per-copy, per-branch concept.
@@ -968,86 +1047,297 @@ function compileCatalogDisplayBlock() {
     const adults = filteredDataset.filter(t => !isKids(t));
     const children = filteredDataset.filter(isKids);
 
-    const renderCard = (t) => {
-        const anyAvailable = titleHasAvailableCopy(t);
-        const iconStats = [
-            t.ageBracket ? `<span class="icon-stat"><i class="fas fa-users"></i> ${t.ageBracket}</span>` : '',
-            t.grade ? `<span class="icon-stat"><i class="fas fa-graduation-cap"></i> Grade ${t.grade}</span>` : ''
-        ].filter(Boolean).join('');
+    displayGrid.innerHTML = renderCatalogSections(adults, children);
+}
 
-        // One row per branch that holds a copy of this title, with a Borrow
-        // button when that specific branch has an available copy, or a
-        // Reserve option (or current reservation status) when it doesn't.
-        const branchRows = (t.copies || []).length === 0 ? '' : Object.entries(
-            (t.copies || []).reduce((acc, c) => {
-                if (!acc[c.branch]) acc[c.branch] = { available: 0, total: 0 };
-                acc[c.branch].total += 1;
-                if (c.status === 'AVAILABLE') acc[c.branch].available += 1;
-                return acc;
-            }, {})
-        ).map(([branch, summary]) => {
-            if (summary.available > 0) {
-                return `
-                    <div class="branch-copy-row">
-                        <span class="branch-copy-label">${branch}: ${summary.available}/${summary.total} available</span>
-                        <button onclick="processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Borrow</button>
-                    </div>
-                `;
-            }
+// A book card is now click-to-expand: clicking anywhere on the card except
+// the Borrow/Reserve buttons opens the full detail modal (cover, synopsis,
+// rating, read toggle). The buttons stop event propagation so they still
+// act immediately without also popping the modal open underneath them.
+function renderBookCard(t) {
+    const titleHasAvailableCopy = (tt) => (tt.copies || []).some(c => c.status === 'AVAILABLE');
+    const anyAvailable = titleHasAvailableCopy(t);
+    const iconStats = [
+        t.ageBracket ? `<span class="icon-stat"><i class="fas fa-users"></i> ${t.ageBracket}</span>` : '',
+        t.grade ? `<span class="icon-stat"><i class="fas fa-graduation-cap"></i> Grade ${t.grade}</span>` : ''
+    ].filter(Boolean).join('');
 
-            const myReservation = (AppState.reservations || []).find(r => r.title_id === t.id && r.branch === branch);
-            let rightSide;
-            if (myReservation && myReservation.status === 'READY') {
-                rightSide = `<button onclick="processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Claim Hold</button>`;
-            } else if (myReservation) {
-                rightSide = `<span class="branch-copy-none">On your waitlist</span>`;
-            } else {
-                rightSide = `<button onclick="processReserveTransaction('${t.id}', '${branch}')" class="branch-reserve-btn">Reserve</button>`;
-            }
+    const branchRows = (t.copies || []).length === 0 ? '' : Object.entries(
+        (t.copies || []).reduce((acc, c) => {
+            if (!acc[c.branch]) acc[c.branch] = { available: 0, total: 0 };
+            acc[c.branch].total += 1;
+            if (c.status === 'AVAILABLE') acc[c.branch].available += 1;
+            return acc;
+        }, {})
+    ).map(([branch, summary]) => {
+        if (summary.available > 0) {
             return `
                 <div class="branch-copy-row">
-                    <span class="branch-copy-label">${branch}: 0/${summary.total} available</span>
-                    ${rightSide}
+                    <span class="branch-copy-label">${branch}: ${summary.available}/${summary.total} available</span>
+                    <button onclick="event.stopPropagation(); processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Borrow</button>
                 </div>
             `;
-        }).join('');
+        }
 
+        const myReservation = (AppState.reservations || []).find(r => r.title_id === t.id && r.branch === branch);
+        let rightSide;
+        if (myReservation && myReservation.status === 'READY') {
+            rightSide = `<button onclick="event.stopPropagation(); processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Claim Hold</button>`;
+        } else if (myReservation) {
+            rightSide = `<span class="branch-copy-none">On your waitlist</span>`;
+        } else {
+            rightSide = `<button onclick="event.stopPropagation(); processReserveTransaction('${t.id}', '${branch}')" class="branch-reserve-btn">Reserve</button>`;
+        }
         return `
-            <div class="catalog-item-card">
-                <div>
-                    <h4 class="auth-title">${t.title}</h4>
-                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${t.author || 'Unknown author'}</p>
-                    ${iconStats ? `<div class="icon-stat-row">${iconStats}</div>` : ''}
-                    <span class="status-badge-node ${anyAvailable ? 'status-available' : 'status-loaned'}">
-                        ${anyAvailable ? 'AVAILABLE' : 'ALL ON LOAN'}
-                    </span>
-                    <div class="branch-copy-list">${branchRows}</div>
-                </div>
+            <div class="branch-copy-row">
+                <span class="branch-copy-label">${branch}: 0/${summary.total} available</span>
+                ${rightSide}
             </div>
         `;
-    };
+    }).join('');
 
-    const renderSubsection = (label, icon, items) => {
-        const pageSize = catalogPageState[label] || CATALOG_PAGE_SIZE;
-        const visible = items.slice(0, pageSize);
-        const hasMore = items.length > visible.length;
-        return `
-            <div class="catalog-subsection">
-                <div class="catalog-subsection-header">
-                    <i class="fas ${icon} catalog-subsection-icon"></i>
-                    <span class="catalog-subsection-title">${label}</span>
-                    <span class="catalog-subsection-count">${items.length}</span>
-                </div>
-                ${items.length > 0
-                    ? `<div class="catalog-subsection-grid">${visible.map(renderCard).join('')}</div>`
-                    : `<p class="catalog-subsection-empty">No ${label.toLowerCase()} titles in this view.</p>`}
-                ${hasMore ? `<div class="catalog-show-more-wrap"><button onclick="expandCatalogSubsection('${label}')" class="btn btn-uh-secondary">Show More (${items.length - visible.length} remaining)</button></div>` : ''}
+    return `
+        <div class="catalog-item-card" onclick="openBookDetailModal('${t.id}')" style="cursor: pointer;">
+            <div class="book-cover-frame">${bookCoverMarkup(t)}</div>
+            <div>
+                <h4 class="auth-title">${t.title}</h4>
+                <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${t.author || 'Unknown author'}</p>
+                ${iconStats ? `<div class="icon-stat-row">${iconStats}</div>` : ''}
+                <span class="status-badge-node ${anyAvailable ? 'status-available' : 'status-loaned'}">
+                    ${anyAvailable ? 'AVAILABLE' : 'ALL ON LOAN'}
+                </span>
+                <div class="branch-copy-list">${branchRows}</div>
             </div>
-        `;
-    };
-
-    displayGrid.innerHTML = renderSubsection('Adults', 'fa-user', adults) + renderSubsection('Children', 'fa-child', children);
+        </div>
+    `;
 }
+
+function renderSubsection(label, icon, items) {
+    const pageSize = catalogPageState[label] || CATALOG_PAGE_SIZE;
+    const visible = items.slice(0, pageSize);
+    const hasMore = items.length > visible.length;
+
+    // Group the currently-visible slice by genre so pagination ("Show
+    // More") still behaves the same way it always did — it just also
+    // buckets whatever's on screen into named genre rows underneath the
+    // main section header.
+    const genreGroups = {};
+    visible.forEach(t => {
+        const g = inferGenre(t);
+        if (!genreGroups[g]) genreGroups[g] = [];
+        genreGroups[g].push(t);
+    });
+
+    const genreBlocksHtml = Object.entries(genreGroups).map(([genre, titles]) => `
+        <div class="catalog-genre-group">
+            <h5 class="catalog-genre-heading">${genre} <span class="catalog-subsection-count">${titles.length}</span></h5>
+            <div class="catalog-subsection-grid">${titles.map(renderBookCard).join('')}</div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="catalog-subsection">
+            <div class="catalog-subsection-header">
+                <i class="fas ${icon} catalog-subsection-icon"></i>
+                <span class="catalog-subsection-title">${label}</span>
+                <span class="catalog-subsection-count">${items.length}</span>
+            </div>
+            ${items.length > 0 ? genreBlocksHtml : `<p class="catalog-subsection-empty">No ${label.toLowerCase()} titles in this view.</p>`}
+            ${hasMore ? `<div class="catalog-show-more-wrap"><button onclick="expandCatalogSubsection('${label}')" class="btn btn-uh-secondary">Show More (${items.length - visible.length} remaining)</button></div>` : ''}
+        </div>
+    `;
+}
+
+// Staff/Library Assistant accounts see the full catalog (they need to
+// manage both sections). Residents see ONLY the section matching their
+// declared age status — this was previously showing both sections to
+// everyone regardless of the 18+ checkbox at registration, which is the
+// bug this fixes.
+function renderCatalogSections(adults, children) {
+    const user = AppState.currentUser;
+    const isStaffLike = user && (user.accountType === 'Staff' || user.accountType === 'Library Assistant');
+
+    if (!user || isStaffLike) {
+        return renderSubsection('Adults', 'fa-user', adults) + renderSubsection('Children', 'fa-child', children);
+    }
+    if (user.isAdult) {
+        return renderSubsection('Adults', 'fa-user', adults);
+    }
+    return renderSubsection('Children', 'fa-child', children);
+}
+
+// Clicking a book card opens this instead of acting immediately — cover,
+// synopsis (fetched live from Open Library by ISBN, since we don't store
+// synopses ourselves), the community's average rating plus the viewer's
+// own rating, a "Mark as Read" toggle, and the same borrow/reserve rows
+// from the card so the person can still act right from here.
+window.openBookDetailModal = async function(titleId) {
+    const t = (AppState.titles || []).find(x => x.id === titleId);
+    if (!t) return;
+
+    openModal(t.title, `
+        <div class="book-detail-layout">
+            <div class="book-cover-frame book-cover-frame-lg">${bookCoverMarkup(t)}</div>
+            <div>
+                <p class="text-xs text-secondary">By ${t.author || 'Unknown author'}</p>
+                <div id="book-detail-rating-block"><p class="catalog-subsection-empty">Loading rating...</p></div>
+            </div>
+        </div>
+        <div id="book-detail-synopsis"><p class="catalog-subsection-empty">Loading synopsis...</p></div>
+        <div id="book-detail-actions" class="branch-copy-list mt-4"></div>
+    `);
+
+    renderBookDetailActions(t);
+    loadBookSynopsis(t);
+    loadBookInteraction(t);
+};
+
+function renderBookDetailActions(t) {
+    const node = document.getElementById('book-detail-actions');
+    if (!node) return;
+
+    const rows = (t.copies || []).length === 0 ? '<p class="catalog-subsection-empty">No copies on record.</p>' : Object.entries(
+        (t.copies || []).reduce((acc, c) => {
+            if (!acc[c.branch]) acc[c.branch] = { available: 0, total: 0 };
+            acc[c.branch].total += 1;
+            if (c.status === 'AVAILABLE') acc[c.branch].available += 1;
+            return acc;
+        }, {})
+    ).map(([branch, summary]) => {
+        if (summary.available > 0) {
+            return `<div class="branch-copy-row"><span class="branch-copy-label">${branch}: ${summary.available}/${summary.total} available</span><button onclick="processBorrowTransaction('${t.id}', '${branch}'); window.closeActiveModal();" class="branch-borrow-btn">Borrow</button></div>`;
+        }
+        const myReservation = (AppState.reservations || []).find(r => r.title_id === t.id && r.branch === branch);
+        let rightSide;
+        if (myReservation && myReservation.status === 'READY') {
+            rightSide = `<button onclick="processBorrowTransaction('${t.id}', '${branch}'); window.closeActiveModal();" class="branch-borrow-btn">Claim Hold</button>`;
+        } else if (myReservation) {
+            rightSide = `<span class="branch-copy-none">On your waitlist</span>`;
+        } else {
+            rightSide = `<button onclick="processReserveTransaction('${t.id}', '${branch}'); window.closeActiveModal();" class="branch-reserve-btn">Reserve</button>`;
+        }
+        return `<div class="branch-copy-row"><span class="branch-copy-label">${branch}: 0/${summary.total} available</span>${rightSide}</div>`;
+    }).join('');
+
+    node.innerHTML = rows;
+}
+
+// Open Library has no bulk endpoint we can pre-fetch — this looks up the
+// ISBN, follows it to the "work" record, and pulls whatever description
+// text is available. Missing synopses (common for older/local titles) get
+// a plain fallback instead of an error.
+async function loadBookSynopsis(t) {
+    const node = document.getElementById('book-detail-synopsis');
+    if (!node) return;
+    const isbn = (t.referenceNo || '').replace(/[^0-9Xx]/g, '');
+
+    if (isbn.length < 9) {
+        node.innerHTML = `<p class="catalog-subsection-empty">No synopsis available for this title yet.</p>`;
+        return;
+    }
+
+    try {
+        const editionRes = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+        if (!editionRes.ok) throw new Error('no edition');
+        const edition = await editionRes.json();
+
+        let description = '';
+        if (typeof edition.description === 'string') {
+            description = edition.description;
+        } else if (edition.description && edition.description.value) {
+            description = edition.description.value;
+        } else if (Array.isArray(edition.works) && edition.works[0] && edition.works[0].key) {
+            const workRes = await fetch(`https://openlibrary.org${edition.works[0].key}.json`);
+            if (workRes.ok) {
+                const work = await workRes.json();
+                description = typeof work.description === 'string' ? work.description : (work.description && work.description.value) || '';
+            }
+        }
+
+        node.innerHTML = description
+            ? `<p class="text-sm">${description.replace(/</g, '&lt;')}</p>`
+            : `<p class="catalog-subsection-empty">No synopsis available for this title yet.</p>`;
+    } catch (error) {
+        node.innerHTML = `<p class="catalog-subsection-empty">No synopsis available for this title yet.</p>`;
+    }
+}
+
+// Fetches this viewer's own read/rating state plus the community average
+// for this title, then renders the interactive star row and read toggle.
+async function loadBookInteraction(t) {
+    const node = document.getElementById('book-detail-rating-block');
+    if (!node) return;
+
+    try {
+        const response = await fetch(CONFIG.N8N_BOOK_INTERACTION_GET_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ titleId: t.id }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            node.innerHTML = `<p class="catalog-subsection-empty">Sign in to rate or track this book.</p>`;
+            return;
+        }
+        renderBookInteractionBlock(t.id, result);
+    } catch (error) {
+        node.innerHTML = `<p class="catalog-subsection-empty">Could not load rating.</p>`;
+    }
+}
+
+function renderBookInteractionBlock(titleId, state) {
+    const node = document.getElementById('book-detail-rating-block');
+    if (!node) return;
+
+    const starsHtml = [1, 2, 3, 4, 5].map(n => `
+        <i class="fas fa-star book-rating-star ${state.myRating && n <= state.myRating ? 'is-active' : ''}" onclick="handleSetBookRating('${titleId}', ${n})"></i>
+    `).join('');
+
+    const avgLabel = state.averageRating
+        ? `${state.averageRating} / 5 (${state.ratingCount} rating${state.ratingCount === 1 ? '' : 's'})`
+        : 'No ratings yet';
+
+    node.innerHTML = `
+        <div class="book-rating-row">${starsHtml}<span class="text-xs text-secondary" style="margin-left: 8px;">${avgLabel}</span></div>
+        <button type="button" class="btn ${state.isRead ? 'btn-uh-primary' : 'btn-uh-secondary'} mt-2" onclick="handleToggleBookRead('${titleId}', ${!state.isRead})">
+            <i class="fas ${state.isRead ? 'fa-check' : 'fa-bookmark'}"></i> ${state.isRead ? 'Read' : 'Mark as Read'}
+        </button>
+    `;
+}
+
+window.handleSetBookRating = async function(titleId, rating) {
+    try {
+        const response = await fetch(CONFIG.N8N_BOOK_INTERACTION_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ titleId, rating }),
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            renderBookInteractionBlock(titleId, result);
+            showToast('⭐ Rating saved.');
+        }
+    } catch (error) {
+        showToast('❌ Could not save rating.');
+    }
+};
+
+window.handleToggleBookRead = async function(titleId, isRead) {
+    try {
+        const response = await fetch(CONFIG.N8N_BOOK_INTERACTION_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ titleId, isRead }),
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            renderBookInteractionBlock(titleId, result);
+            showToast(isRead ? '📖 Marked as read.' : 'Marked as unread.');
+        }
+    } catch (error) {
+        showToast('❌ Could not update.');
+    }
+};
 
 // Renders the stat-counter strip (books / active loans / estates) using the
 // privacy-safe aggregate block from sync — no per-member data involved.

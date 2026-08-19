@@ -18,6 +18,16 @@
         .auth-panels::-webkit-scrollbar { width: 8px; }
         .auth-panels::-webkit-scrollbar-track { background: transparent; }
         .auth-panels::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 4px; }
+        .book-cover-frame { width: 100%; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; margin-bottom: 10px; background: #eee; }
+        .book-cover-frame-lg { max-width: 160px; }
+        .book-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .book-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #d9d9e3, #b8b8c9); color: #6b6b80; font-size: 2rem; }
+        .catalog-genre-group { margin-top: 1.25rem; }
+        .catalog-genre-heading { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: var(--text-dark, #222); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px; }
+        .book-detail-layout { display: flex; gap: 16px; align-items: flex-start; }
+        .book-rating-row { display: flex; align-items: center; }
+        .book-rating-star { color: #d8d8e0; cursor: pointer; margin-right: 3px; font-size: 1.1rem; }
+        .book-rating-star.is-active { color: #f5a623; }
     </style>
 </head>
 <body>
@@ -74,8 +84,8 @@
             <div class="container hero-grid">
                 <div class="hero-copy">
                     <span class="tagline-badge">A Unity Homes Community Amenity</span>
-                    <h1 class="hero-title">A shared shelf for every Unity Homes estate.</h1>
-                    <p class="hero-subtitle">Borrow a book, pass it on, and meet your neighbours in between. The Unity Shelf runs on the same trust that built our estates — everything below is what's currently on it.</p>
+                    <h1 class="hero-title">The Unity Shelf: A Library for Our Communities</h1>
+                    <p class="hero-subtitle">The Unity Shelf is built on the same spirit of trust and community that brings our estates together — Log in to explore the collection below and discover what's currently available to borrow.</p>
                 </div>
 
                 <div class="auth-card auth-toggle-card hero-auth-card">
@@ -131,7 +141,7 @@
                                             <option value="Unity Gardens">Unity Gardens</option>
                                             <option value="Unity Silver Hill">Unity Silver Hill</option>
                                             <option value="Unity Parkside">Unity Parkside</option>
-                                            <option value="STAFF">Staff (Unity Homes Operations)</option>
+                                            <option value="STAFF">Unity Staff</option>
                                         </select>
                                     </div>
                                 </div>
@@ -146,7 +156,7 @@
                                 <div class="form-group">
                                     <label class="checkbox-label" for="signup-is-adult">
                                         <input type="checkbox" id="signup-is-adult">
-                                        I confirm I am 18 years of age or older
+                                        Check this if over 18 years
                                     </label>
                                     <p class="field-hint">Leave unchecked if under 18 — adult-category titles will be hidden from your catalog view.</p>
                                 </div>

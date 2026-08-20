@@ -6,9 +6,8 @@ const { startReminderCron } = require('./cron');
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
-  origin: allowedOrigins.length ? allowedOrigins : true,
+  origin: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
